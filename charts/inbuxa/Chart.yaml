@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: v2
+name: inbuxa
+description: The inbuxa mail server, webmail and console, on Kubernetes
+type: application
+# Releases are 27.1.0-rc.N, then 27.1.0. Between them this stays a dev version.
+version: 0.0.0-dev
+appVersion: "27.1"
+# The three newest Kubernetes minors at release time (support matrix)
+kubeVersion: ">=1.35.0-0"
+sources:
+  - https://git.coffeylabs.org/inbuxa/inbuxa-charts

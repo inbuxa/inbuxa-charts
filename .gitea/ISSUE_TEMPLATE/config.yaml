@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Server, webmail or console problem
+    url: https://git.coffeylabs.org/inbuxa
+    about: A problem in inbuxa itself rather than the chart belongs in that project.
+  - name: Questions
+    url: https://community.coffeylabs.org
+    about: How to set something up, or whether the chart fits your cluster.

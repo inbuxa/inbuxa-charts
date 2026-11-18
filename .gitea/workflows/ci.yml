@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# The chart's checks on every pull request and on main: helm lint under
+# Helm 4 and Helm 3, the values schema, kubeconform against the three newest
+# Kubernetes minors, kube-linter, and helm-unittest. All of it is
+# tools/check.sh, so a contributor runs exactly this before pushing.
+#
+# Installs on a real cluster are the lab's job (inbuxa-k8s-lab), not this
+# one's. The job image is pinned by digest, the only action is
+# coffey-labs/actions checkout pinned by SHA, and every tool is pinned by
+# version and SHA-256 in tools/install-tools.sh.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  chart:
+    runs-on: light
+    container:
+      image: mirror.gcr.io/library/debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 # trixie-slim
+    steps:
+      - name: Packages
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends ca-certificates curl git >/dev/null
+      - uses: coffey-labs/actions/checkout@fab0c4d45e0162963965f1555df27b7bed5e20ec
+      - run: tools/install-tools.sh
+      - run: tools/check.sh

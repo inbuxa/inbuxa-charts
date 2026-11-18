@@ -1,0 +1,72 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+name: Release candidate report
+about: How a release candidate went on your cluster, good or bad
+title: "RC report: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing a release candidate. A report that says "it
+        worked" is as useful as one that doesn't. Leave out passwords, keys
+        and hostnames you'd rather not publish.
+  - type: input
+    id: chart
+    attributes:
+      label: Chart version
+      placeholder: 27.1.0-rc.1
+    validations:
+      required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: How it went
+      options:
+        - Worked
+        - Worked, with problems
+        - Didn't work
+    validations:
+      required: true
+  - type: checkboxes
+    id: tried
+    attributes:
+      label: What you tried
+      options:
+        - label: Fresh install
+        - label: Upgrade from the previous release candidate
+        - label: Mail in (SMTP from outside)
+        - label: Mail out (delivery to another provider)
+        - label: Webmail sign-in and use
+        - label: Console sign-in and use
+        - label: Killing a pod or draining a node
+        - label: Backup and restore
+  - type: input
+    id: kubernetes
+    attributes:
+      label: Kubernetes version and distribution
+      placeholder: 1.36.2, k3s
+    validations:
+      required: true
+  - type: input
+    id: data
+    attributes:
+      label: Data layer
+      description: Your PostgreSQL, NATS and S3, and their versions.
+      placeholder: CloudNativePG 17, NATS 2.11, Garage 2.1
+  - type: input
+    id: network
+    attributes:
+      label: Load balancer and ingress
+      placeholder: MetalLB, Envoy Gateway
+  - type: textarea
+    id: notes
+    attributes:
+      label: What you saw
+      description: Anything that went wrong or was unclear, and what you did about it.
+  - type: textarea
+    id: values
+    attributes:
+      label: Your values
+      description: helm get values <release>, with secrets removed.
+      render: yaml

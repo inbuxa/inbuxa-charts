@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Each file in ci/ is one set of values tools/check.sh renders and checks.
+# This one is the defaults, as they are.
+{}

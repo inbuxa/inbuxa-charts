@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Values for the inbuxa chart. Every key here is described in
+# values.schema.json, which rejects a key it doesn't know: a typo fails the
+# install instead of being ignored.
+
+# Overrides the "inbuxa" in the names of everything the chart creates.
+nameOverride: ""
+# Overrides the whole name (release name plus chart name).
+fullnameOverride: ""

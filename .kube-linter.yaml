@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Every built-in check, on everything the chart renders. A check is only
+# left out here with a line saying why.
+checks:
+  addAllBuiltIn: true
+  exclude: []

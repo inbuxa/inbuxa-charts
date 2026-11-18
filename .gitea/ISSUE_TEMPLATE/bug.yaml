@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+name: Bug
+about: Something in the chart is wrong
+title: ""
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a problem in the server, webmail or console themselves, file it
+        in that project instead. Leave out passwords, keys and anything else
+        you'd rather not publish.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: chart
+    attributes:
+      label: Chart version
+      placeholder: 27.1.0-rc.1
+    validations:
+      required: true
+  - type: input
+    id: kubernetes
+    attributes:
+      label: Kubernetes version and distribution
+      placeholder: 1.36.2, k3s
+    validations:
+      required: true
+  - type: input
+    id: helm
+    attributes:
+      label: Helm version
+      placeholder: 4.3.2
+  - type: textarea
+    id: values
+    attributes:
+      label: Your values
+      description: What you set (helm get values <release>), with secrets removed.
+      render: yaml
+  - type: textarea
+    id: logs
+    attributes:
+      label: Events and logs
+      description: kubectl describe / kubectl logs for the pods involved.
+      render: text
