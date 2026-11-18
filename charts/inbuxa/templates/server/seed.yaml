@@ -1,0 +1,158 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+The new store's setup, once, on install: the server's --seed runs the seed
+(a JMAP request body) as the system administrator and exits, before any
+server pod starts. Pre-install hooks run before the chart's other objects
+exist, so the Job brings its own copy of config.json. A seed applies only
+to a new store; on a store that has one, the run does nothing and exits 0.
+*/}}
+{{- $root := . }}
+{{- $server := .Values.server }}
+{{- $seed := $server.seed }}
+{{- if $seed.enabled }}
+{{- if and $seed.request $seed.existingConfigMap }}
+{{- fail "server.seed: set request or existingConfigMap, not both" }}
+{{- end }}
+{{- if not (or $seed.request $seed.existingConfigMap) }}
+{{- fail "server.seed.enabled needs the seed: server.seed.request, or server.seed.existingConfigMap" }}
+{{- end }}
+{{- $name := printf "%s-seed" (include "inbuxa.fullname" $root) }}
+{{- if eq $seed.existingConfigMap $name }}
+{{- fail (printf "server.seed.existingConfigMap can't be %q: the chart makes a ConfigMap of that name for the seed run, which replaces yours" $name) }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: seed
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+data:
+  config.json: {{ toJson $server.dataStore | quote }}
+  {{- if $seed.request }}
+  seed.json: {{ toJson $seed.request | quote }}
+  {{- end }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: seed
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "0"
+    # A failed run stays, for its log, until the next install or a day
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    ignore-check.kube-linter.io/no-liveness-probe: "A one-shot that serves nothing; activeDeadlineSeconds bounds it"
+    ignore-check.kube-linter.io/no-readiness-probe: "A one-shot that serves nothing"
+    ignore-check.kube-linter.io/restart-policy: "Never on purpose: a second run would apply part of the seed twice"
+spec:
+  ttlSecondsAfterFinished: 86400
+  # Never again on its own: a run that stopped partway left part of the
+  # seed in the store, and a second would make it twice
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ $seed.timeoutSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "inbuxa.labels" $root | nindent 8 }}
+        app.kubernetes.io/component: seed
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Never
+      {{- with $root.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 2000
+        runAsGroup: 2000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: seed
+          image: {{ include "inbuxa.server.image" $root }}
+          imagePullPolicy: {{ $server.image.pullPolicy }}
+          args: ["--seed", "/etc/inbuxa/seed/seed.json", "--config", "/etc/inbuxa/config.json"]
+          env:
+            - name: INBUXA_HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # The defaults the seed run writes include the listeners
+            - name: INBUXA_LISTENER_PORTS
+              value: {{ include "inbuxa.server.listenerPorts" $root | quote }}
+          resources:
+            {{- toYaml (default $server.resources $seed.resources) | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/inbuxa/config.json
+              subPath: config.json
+              readOnly: true
+            - name: seed
+              mountPath: /etc/inbuxa/seed
+              readOnly: true
+            {{- if $server.secretMounts }}
+            - name: secrets
+              mountPath: /etc/inbuxa/secrets
+              readOnly: true
+            {{- end }}
+            {{- if $seed.secretMounts }}
+            - name: seed-secrets
+              mountPath: /etc/inbuxa/seed-secrets
+              readOnly: true
+            {{- end }}
+            - name: data
+              mountPath: /var/lib/inbuxa
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $name }}
+            items: [{key: config.json, path: config.json}]
+        - name: seed
+          configMap:
+            {{- if $seed.request }}
+            name: {{ $name }}
+            {{- else }}
+            name: {{ $seed.existingConfigMap }}
+            {{- end }}
+            items: [{key: seed.json, path: seed.json}]
+        {{- range $volume, $mounts := dict "secrets" $server.secretMounts "seed-secrets" $seed.secretMounts }}
+        {{- if $mounts }}
+        - name: {{ $volume }}
+          projected:
+            defaultMode: 0440
+            sources:
+              {{- range $mounts }}
+              - secret:
+                  name: {{ .secretName }}
+                  items:
+                    {{- toYaml .items | nindent 20 }}
+              {{- end }}
+        {{- end }}
+        {{- end }}
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+{{- end }}

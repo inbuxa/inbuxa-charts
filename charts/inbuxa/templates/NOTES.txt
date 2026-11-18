@@ -1,4 +1,19 @@
 inbuxa {{ .Chart.AppVersion }} is installed as "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
 
-This chart is in development and creates nothing yet. The guide is at
-https://docs.inbuxa.org/
+The server runs as {{ range $name, $g := .Values.server.groups }}{{ if $g.enabled }}{{ $name }} ({{ $g.replicas }}) {{ end }}{{ end }}on the data store in config.json.
+{{- if .Values.server.services.mail.enabled }}
+
+Mail from outside reaches the {{ .Values.server.services.mail.type }} Service {{ include "inbuxa.fullname" . }}-mail. Its address:
+  kubectl -n {{ .Release.Namespace }} get service {{ include "inbuxa.fullname" . }}-mail
+{{- end }}
+
+{{ if .Values.server.seed.enabled -}}
+The store was set up from server.seed before the server started (once: a
+store that was set up already is left as it is).
+{{- else -}}
+No seed was given (server.seed), so a new store has no domain, administrator
+or cluster roles yet, and the front and mta groups name roles that don't
+exist. Set the seed and install again on an empty store.
+{{- end }}
+
+This chart is in development. The guide is at https://docs.inbuxa.org/

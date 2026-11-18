@@ -9,3 +9,161 @@
 nameOverride: ""
 # Overrides the whole name (release name plus chart name).
 fullnameOverride: ""
+
+imagePullSecrets: []
+
+server:
+  image:
+    repository: ghcr.io/inbuxa/inbuxa-server
+    # Defaults to the chart's appVersion
+    tag: ""
+    # sha256:..., which wins over the tag when set
+    digest: ""
+    pullPolicy: IfNotPresent
+
+  # The data store, written as the server's config.json. Required. A secret
+  # in it is a File reference to a path under /etc/inbuxa/secrets, never the
+  # secret itself. For example:
+  #   "@type": PostgreSql
+  #   host: pg-rw.data.svc
+  #   port: 5432
+  #   database: inbuxa
+  #   authUsername: inbuxa
+  #   authSecret: {"@type": File, filePath: /etc/inbuxa/secrets/pg-password}
+  #   useTls: true
+  dataStore: {}
+
+  # Secrets mounted under /etc/inbuxa/secrets, where the data store, blob
+  # store and coordinator settings point with File references. Each entry is
+  # an existing Secret and the keys to mount from it:
+  #   - secretName: inbuxa-data
+  #     items: [{key: pg-password, path: pg-password}]
+  secretMounts: []
+
+  # The new store's setup, applied once on install, before any server pod
+  # starts: the domain, administrator, blob store, coordinator and cluster
+  # roles the groups below name. A JMAP request body ("using" and
+  # "methodCalls"), the calls an administrator would send to /jmap, run as
+  # the system administrator. A value {"$file": /path} is replaced by that
+  # file's contents: put secrets in seed.secretMounts, never in the seed.
+  # Ignored by a store that's set up already. See the server's --seed.
+  seed:
+    enabled: false
+    # The seed, as values
+    request: {}
+    # Or an existing ConfigMap with it under the key seed.json
+    existingConfigMap: ""
+    # Secrets only the seed run sees, at /etc/inbuxa/seed-secrets, in the
+    # same form as secretMounts
+    secretMounts: []
+    timeoutSeconds: 600
+    resources: {}
+
+  # Where browsers and clients reach the server, as https://host. Sign-in
+  # pages and OAuth metadata name it.
+  publicUrl: ""
+
+  # The port in the pod of each listener a new store gets, which is what
+  # the Services send traffic to. 0 leaves that listener out. The pods may
+  # listen below 1024 without any privilege: they set the namespaced sysctl
+  # net.ipv4.ip_unprivileged_port_start, which Pod Security "restricted"
+  # allows. SMTP stays on 25: the server's default rules tell mail from the
+  # internet from submissions by local port 25. Used once, when the store is
+  # new; after that the listeners are settings in the console, and these
+  # have to match them.
+  listeners:
+    smtp: 25
+    submissions: 465
+    imaps: 993
+    pop3s: 0
+    sieve: 4190
+    https: 443
+    http: 8080
+
+  # The server's role groups, each a Deployment. INBUXA_ROLE names a role
+  # (a ClusterRole in the server's registry) that says which background
+  # tasks the group runs; an empty role runs them all.
+  groups:
+    # Client protocols, web and JMAP; no outbound delivery, no scheduler
+    front:
+      enabled: true
+      replicas: 2
+      role: peer
+      resources: {}
+      nodeSelector: {}
+      tolerations: []
+      affinity: {}
+      podAnnotations: {}
+      extraEnv: []
+    # As front, plus outbound delivery. Place it where its egress address
+    # is the one your SPF and PTR records name.
+    mta:
+      enabled: true
+      replicas: 2
+      role: peer-mta
+      resources: {}
+      nodeSelector: {}
+      tolerations: []
+      affinity: {}
+      podAnnotations: {}
+      extraEnv: []
+    # Everything, including the task scheduler. Exactly one replica: a
+    # second would queue every maintenance task twice.
+    core:
+      enabled: true
+      replicas: 1
+      role: ""
+      resources: {}
+      nodeSelector: {}
+      tolerations: []
+      affinity: {}
+      podAnnotations: {}
+      extraEnv: []
+
+  # Used for every group that sets no resources of its own
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+
+  # Time for SMTP sessions in progress to finish when a pod stops
+  terminationGracePeriodSeconds: 120
+
+  # Pods of a group are spread across nodes (never two on one node while
+  # another node has room) and, where the cluster has zones, across zones.
+  topologySpread:
+    nodes: DoNotSchedule
+    zones: ScheduleAnyway
+
+  # At most this many pods of a group down at once for a drain or upgrade
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+
+  services:
+    # Web, JMAP and the API, inside the cluster. Front ends and an Ingress
+    # or Gateway route point here.
+    http:
+      type: ClusterIP
+      annotations: {}
+      groups: [front, core]
+    # Mail from outside, on the standard ports. Local keeps each client's
+    # own address (no SNAT): the load balancer sends only to nodes running a
+    # mail pod.
+    mail:
+      enabled: true
+      type: LoadBalancer
+      externalTrafficPolicy: Local
+      loadBalancerClass: ""
+      loadBalancerIP: ""
+      annotations: {}
+      groups: [front, mta]
+      ports:
+        smtp: 25
+        submissions: 465
+        imaps: 993
+        pop3s: 995
+        sieve: 4190

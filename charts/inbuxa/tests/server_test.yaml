@@ -1,0 +1,238 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+suite: server
+templates:
+  - server/configmap.yaml
+  - server/deployment.yaml
+  - server/pdb.yaml
+  - server/service-http.yaml
+  - server/service-mail.yaml
+release:
+  name: mail
+  namespace: inbuxa
+values:
+  - ../ci/defaults-values.yaml
+tests:
+  - it: refuses to render without a data store
+    set:
+      server.dataStore: null
+    template: server/configmap.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: server.dataStore is required
+
+  - it: writes the data store as config.json
+    template: server/configmap.yaml
+    asserts:
+      - equal:
+          path: data["config.json"]
+          value: '{"@type":"PostgreSql","authSecret":{"@type":"File","filePath":"/etc/inbuxa/secrets/pg-password"},"authUsername":"inbuxa","database":"inbuxa","host":"pg-rw.data.svc","port":5432,"useTls":true}'
+
+  - it: makes one Deployment per group, core with a single replica
+    template: server/deployment.yaml
+    asserts:
+      - hasDocuments:
+          count: 3
+      - equal:
+          path: metadata.name
+          value: mail-inbuxa-front
+        documentIndex: 0
+      - equal:
+          path: spec.replicas
+          value: 2
+        documentIndex: 1
+      - equal:
+          path: spec.replicas
+          value: 1
+        documentIndex: 2
+
+  - it: never runs two cores at once, even mid-rollout
+    template: server/deployment.yaml
+    documentIndex: 2
+    asserts:
+      - equal:
+          path: spec.strategy.rollingUpdate
+          value: {maxSurge: 0, maxUnavailable: 1}
+
+  - it: keeps front at full strength during a rollout
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.strategy.rollingUpdate
+          value: {maxSurge: 1, maxUnavailable: 0}
+
+  - it: names each group's role, and none for core
+    template: server/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_ROLE, value: peer}
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_ROLE, value: peer-mta}
+        documentIndex: 1
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_ROLE, value: ""}
+        documentIndex: 2
+
+  - it: takes the node's name from the pod
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: INBUXA_HOSTNAME
+            valueFrom: {fieldRef: {fieldPath: metadata.name}}
+
+  - it: keeps the standard ports, POP3 off by default
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: INBUXA_LISTENER_PORTS
+            value: smtp=25,submissions=465,imaps=993,pop3s=off,sieve=4190,https=443,http=8080
+      - lengthEqual:
+          path: spec.template.spec.containers[0].ports
+          count: 6
+
+  - it: lets the pod listen from its lowest port with the namespaced sysctl
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.sysctls
+          value: [{name: net.ipv4.ip_unprivileged_port_start, value: "25"}]
+
+  - it: needs no sysctl when every listener is above 1024
+    set:
+      server.listeners: {smtp: 0, submissions: 4465, imaps: 9993, sieve: 4190, https: 8443, http: 8080}
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - notExists:
+          path: spec.template.spec.securityContext.sysctls
+
+  - it: refuses to move SMTP off 25
+    set:
+      server.listeners.smtp: 2525
+    template: server/deployment.yaml
+    asserts:
+      - failedTemplate: {}
+
+  - it: runs with nothing added back
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext
+          value:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+
+  - it: probes plain HTTP, ready only while the data store answers
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet
+          value: {path: /healthz/ready, port: http}
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet
+          value: {path: /healthz/live, port: http}
+
+  - it: mounts the secrets read-only, under /etc/inbuxa/secrets
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content: {name: secrets, mountPath: /etc/inbuxa/secrets, readOnly: true}
+      - equal:
+          path: spec.template.spec.volumes[1].projected.sources[0].secret
+          value: {name: inbuxa-data, items: [{key: pg-password, path: pg-password}]}
+
+  - it: pins the image by digest when one is given
+    set:
+      server.image.digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/inbuxa/inbuxa-server@sha256:1111111111111111111111111111111111111111111111111111111111111111
+
+  - it: leaves out a disabled group, its budget and its Service labels
+    set:
+      server.groups.mta.enabled: false
+      server.services.mail.groups: [front]
+    asserts:
+      - hasDocuments:
+          count: 2
+        template: server/deployment.yaml
+      - hasDocuments:
+          count: 2
+        template: server/pdb.yaml
+
+  - it: refuses a Service that names a disabled group
+    set:
+      server.groups.mta.enabled: false
+    template: server/service-mail.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: names "mta", which is not enabled
+
+  - it: sends mail to front and mta, web to front and core
+    template: server/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["inbuxa.org/serves-mail"]
+          value: "true"
+        documentIndex: 0
+      - equal:
+          path: spec.template.metadata.labels["inbuxa.org/serves-mail"]
+          value: "true"
+        documentIndex: 1
+      - notExists:
+          path: spec.template.metadata.labels["inbuxa.org/serves-mail"]
+        documentIndex: 2
+      - notExists:
+          path: spec.template.metadata.labels["inbuxa.org/serves-http"]
+        documentIndex: 1
+      - equal:
+          path: spec.template.metadata.labels["inbuxa.org/serves-http"]
+          value: "true"
+        documentIndex: 2
+
+  - it: maps the standard mail ports onto the listeners, keeping client addresses
+    template: server/service-mail.yaml
+    asserts:
+      - equal:
+          path: spec.externalTrafficPolicy
+          value: Local
+      - equal:
+          path: spec.ports
+          value:
+            - {name: smtp, port: 25, targetPort: smtp, protocol: TCP}
+            - {name: submissions, port: 465, targetPort: submissions, protocol: TCP}
+            - {name: imaps, port: 993, targetPort: imaps, protocol: TCP}
+            - {name: sieve, port: 4190, targetPort: sieve, protocol: TCP}
+
+  - it: refuses a core with a second replica
+    set:
+      server.groups.core.replicas: 2
+    template: server/deployment.yaml
+    asserts:
+      - failedTemplate: {}

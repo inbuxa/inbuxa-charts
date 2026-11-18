@@ -1,0 +1,23 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+The server's config.json: the data store and nothing else. Everything else
+the server keeps in that store. Secrets in it are File references.
+*/}}
+{{- if not .Values.server.dataStore }}
+{{- fail "server.dataStore is required: the server's data store, with its secrets as File references under /etc/inbuxa/secrets" }}
+{{- end }}
+{{- if not (index .Values.server.dataStore "@type") }}
+{{- fail "server.dataStore needs an \"@type\" (PostgreSql, MySql, FoundationDb, ...)" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "inbuxa.fullname" . }}-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+data:
+  config.json: {{ toJson .Values.server.dataStore | quote }}

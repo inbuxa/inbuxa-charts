@@ -1,0 +1,106 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+suite: seed
+templates:
+  - server/seed.yaml
+release:
+  name: mail
+  namespace: inbuxa
+values:
+  - ../ci/defaults-values.yaml
+set:
+  server.seed.enabled: true
+  server.seed.request:
+    using: ["urn:ietf:params:jmap:core", "urn:inbuxa:jmap:registry"]
+    methodCalls: [["x:Domain/set", {create: {d: {name: example.org}}}, "d"]]
+  server.seed.secretMounts:
+    - secretName: inbuxa-seed
+      items: [{key: admin-password, path: admin-password}]
+tests:
+  - it: makes nothing without a seed
+    set:
+      server.seed.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: runs before the chart's other objects, and only on install
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-install
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "-5"
+        documentIndex: 0
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "0"
+        documentIndex: 1
+
+  - it: brings its own config.json and the seed
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: data["seed.json"]
+          value: '{"methodCalls":[["x:Domain/set",{"create":{"d":{"name":"example.org"}}},"d"]],"using":["urn:ietf:params:jmap:core","urn:inbuxa:jmap:registry"]}'
+      - exists:
+          path: data["config.json"]
+
+  - it: runs --seed once, never retried
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: spec.backoffLimit
+          value: 0
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value: ["--seed", "/etc/inbuxa/seed/seed.json", "--config", "/etc/inbuxa/config.json"]
+      - equal:
+          path: spec.template.spec.restartPolicy
+          value: Never
+
+  - it: mounts the seed's secrets apart from the server's
+    documentIndex: 1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content: {name: seed-secrets, mountPath: /etc/inbuxa/seed-secrets, readOnly: true}
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content: {name: secrets, mountPath: /etc/inbuxa/secrets, readOnly: true}
+
+  - it: reads an existing ConfigMap instead
+    set:
+      server.seed.request: null
+      server.seed.existingConfigMap: my-seed
+    asserts:
+      - notExists:
+          path: data["seed.json"]
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.volumes
+          content: {name: seed, configMap: {name: my-seed, items: [{key: seed.json, path: seed.json}]}}
+        documentIndex: 1
+
+  - it: refuses to run without a seed
+    set:
+      server.seed.request: null
+    asserts:
+      - failedTemplate:
+          errorPattern: needs the seed
+
+  - it: refuses two seeds
+    set:
+      server.seed.existingConfigMap: my-seed
+    asserts:
+      - failedTemplate:
+          errorPattern: not both
+
+  - it: refuses a ConfigMap with the name of its own
+    set:
+      server.seed.request: null
+      server.seed.existingConfigMap: mail-inbuxa-seed
+    asserts:
+      - failedTemplate:
+          errorPattern: the chart makes a ConfigMap of that name

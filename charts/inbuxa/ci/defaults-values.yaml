@@ -2,5 +2,16 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Each file in ci/ is one set of values tools/check.sh renders and checks.
-# This one is the defaults, as they are.
-{}
+# This one is the defaults plus the one value that has none: the data store.
+server:
+  dataStore:
+    "@type": PostgreSql
+    host: pg-rw.data.svc
+    port: 5432
+    database: inbuxa
+    authUsername: inbuxa
+    authSecret: {"@type": File, filePath: /etc/inbuxa/secrets/pg-password}
+    useTls: true
+  secretMounts:
+    - secretName: inbuxa-data
+      items: [{key: pg-password, path: pg-password}]
