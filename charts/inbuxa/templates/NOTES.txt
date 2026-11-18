@@ -1,0 +1,4 @@
+inbuxa {{ .Chart.AppVersion }} is installed as "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+This chart is in development and creates nothing yet. The guide is at
+https://docs.inbuxa.org/

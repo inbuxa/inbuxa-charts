@@ -1,0 +1,11 @@
+# Kept out of the packaged chart
+.git/
+.gitignore
+.DS_Store
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+ci/
+tests/

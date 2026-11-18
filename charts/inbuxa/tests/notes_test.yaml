@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+suite: install notes
+templates:
+  - NOTES.txt
+release:
+  name: mail
+  namespace: inbuxa
+tests:
+  - it: names the release and its namespace
+    asserts:
+      - matchRegexRaw:
+          pattern: 'installed as "mail" in namespace "inbuxa"'
+  - it: points at the guide
+    asserts:
+      - matchRegexRaw:
+          pattern: https://docs\.inbuxa\.org/

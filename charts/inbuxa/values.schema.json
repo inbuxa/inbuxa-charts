@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Values for the inbuxa chart",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "global": {
+      "description": "Set by Helm for charts that have subcharts. Unused here.",
+      "type": "object"
+    },
+    "nameOverride": {
+      "description": "Replaces \"inbuxa\" in the names of everything the chart creates.",
+      "type": "string",
+      "maxLength": 40,
+      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+    },
+    "fullnameOverride": {
+      "description": "Replaces the whole name: the release name and the chart name.",
+      "type": "string",
+      "maxLength": 52,
+      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+    }
+  }
+}
