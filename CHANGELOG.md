@@ -33,3 +33,12 @@ runs, pinned by digest.
   can't run with older pods up, the server Deployments are scaled to 0
   first, which a rolling update can't do. Then `--upgrade-store` upgrades
   the store.
+- `webmail` and `console`, off by default: Deployments, Services, optional
+  autoscalers and PodDisruptionBudgets, read-only root filesystems. The
+  webmail keeps sessions in sealed cookies, so any replica serves any
+  request, and signs in through the server's page. Its app and OAuth client
+  secrets are a Secret the chart makes (kept across upgrades) or
+  `webmail.existingSecret`. Every server pod is told both addresses, so it
+  registers them as OAuth clients.
+- `routes`: the server's, the webmail's and the console's public addresses,
+  each by host name, as Gateway API HTTPRoutes or one Ingress.

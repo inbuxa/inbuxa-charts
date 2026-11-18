@@ -1,0 +1,190 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+INBUXA Admin, the console: static files behind nginx. The browser loads it
+from here and talks to the server's publicUrl directly; API_BASE_URL tells
+it where that is, and the server lets the console's origin in because
+INBUXA_ADMIN_URL names it.
+*/}}
+{{- $root := . }}
+{{- $con := .Values.console }}
+{{- if $con.enabled }}
+{{- include "inbuxa.frontEnd.checkUrl" (dict "url" $con.publicUrl "name" "console") }}
+{{- if not .Values.server.publicUrl }}
+{{- fail "console: set server.publicUrl too; the console's browser calls the server there" }}
+{{- end }}
+{{- $name := printf "%s-console" (include "inbuxa.fullname" $root) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: console
+spec:
+  {{- if not $con.autoscaling.enabled }}
+  replicas: {{ $con.replicas }}
+  {{- end }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "inbuxa.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: console
+  template:
+    metadata:
+      labels:
+        {{- include "inbuxa.labels" $root | nindent 8 }}
+        app.kubernetes.io/component: console
+      {{- with $con.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Always
+      {{- with $root.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        # nginx, in the nginx-unprivileged image
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 10
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "inbuxa.selectorLabels" $root | nindent 14 }}
+              app.kubernetes.io/component: console
+      {{- with $con.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $con.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $con.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: console
+          image: {{ include "inbuxa.frontEnd.image" (dict "image" $con.image "name" "console") }}
+          imagePullPolicy: {{ $con.image.pullPolicy }}
+          env:
+            - name: API_BASE_URL
+              value: {{ trimSuffix "/" $root.Values.server.publicUrl | quote }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml $con.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            # index.html, the policy and the pid file are written here at start
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /var/cache/nginx
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi
+        - name: cache
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: console
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "inbuxa.selectorLabels" $root | nindent 4 }}
+    app.kubernetes.io/component: console
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+{{- if $con.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: console
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $name }}
+  minReplicas: {{ $con.autoscaling.minReplicas }}
+  maxReplicas: {{ $con.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $con.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}
+{{- if and $con.podDisruptionBudget.enabled (or $con.autoscaling.enabled (gt (int $con.replicas) 1)) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: console
+spec:
+  unhealthyPodEvictionPolicy: AlwaysAllow
+  maxUnavailable: {{ $con.podDisruptionBudget.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "inbuxa.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: console
+{{- end }}
+{{- end }}

@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# The webmail and the console with their defaults, routed by an Ingress.
+server:
+  dataStore:
+    "@type": PostgreSql
+    host: pg-rw.data.svc
+    port: 5432
+    database: inbuxa
+    authUsername: inbuxa
+    authSecret: {"@type": File, filePath: /etc/inbuxa/secrets/pg-password}
+  secretMounts:
+    - secretName: inbuxa-data
+      items: [{key: pg-password, path: pg-password}]
+  publicUrl: https://mail.example.org
+webmail:
+  enabled: true
+  image:
+    tag: 27.1-rc.7
+  publicUrl: https://webmail.example.org
+console:
+  enabled: true
+  image:
+    tag: 27.1-rc.21
+  publicUrl: https://admin.example.org
+routes:
+  ingress:
+    enabled: true
+    className: nginx
+    annotations: {example.org/route: public}
+    tls: [{hosts: [mail.example.org, webmail.example.org, admin.example.org], secretName: mail-tls}]

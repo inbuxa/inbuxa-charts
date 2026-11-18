@@ -61,3 +61,29 @@ server:
     resources:
       requests: {cpu: 100m, memory: 256Mi}
       limits: {cpu: "1", memory: 1Gi}
+webmail:
+  enabled: true
+  image:
+    digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+  publicUrl: https://webmail.example.org
+  existingSecret: webmail-secrets
+  trustedProxies: [10.0.0.0/8]
+  autoscaling:
+    enabled: true
+  podAnnotations: {example.org/team: mail}
+  nodeSelector: {example.org/tier: web}
+  tolerations: [{key: example.org/tier, operator: Exists, effect: NoSchedule}]
+  extraEnv: [{name: LOGIN_RATE_LIMIT, value: "10"}]
+console:
+  enabled: true
+  image:
+    tag: 27.1-rc.21
+  publicUrl: https://admin.example.org
+  autoscaling:
+    enabled: true
+  podAnnotations: {example.org/team: mail}
+routes:
+  gateway:
+    enabled: true
+    parentRefs: [{name: public, namespace: gateway, sectionName: https}]
+    annotations: {example.org/route: public}

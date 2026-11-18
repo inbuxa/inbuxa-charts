@@ -1,0 +1,102 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+Routes from outside, one per public address, by host name: the server's
+publicUrl to its HTTP Service, and the webmail's and the console's to
+theirs. Gateway API HTTPRoutes, or an Ingress where there's no Gateway.
+*/}}
+{{- $root := . }}
+{{- $routes := .Values.routes }}
+{{- $full := include "inbuxa.fullname" . }}
+{{- $backends := list }}
+{{- if .Values.server.publicUrl }}
+{{- $backends = append $backends (dict "name" "server" "host" (include "inbuxa.hostOf" .Values.server.publicUrl) "service" (printf "%s-http" $full)) }}
+{{- end }}
+{{- if .Values.webmail.enabled }}
+{{- $backends = append $backends (dict "name" "webmail" "host" (include "inbuxa.hostOf" .Values.webmail.publicUrl) "service" (printf "%s-webmail" $full)) }}
+{{- end }}
+{{- if .Values.console.enabled }}
+{{- $backends = append $backends (dict "name" "console" "host" (include "inbuxa.hostOf" .Values.console.publicUrl) "service" (printf "%s-console" $full)) }}
+{{- end }}
+{{- $hosts := dict }}
+{{- range $backends }}
+{{- if hasKey $hosts .host }}
+{{- fail (printf "routes: %s and %s both have the host %s; each needs its own" (index $hosts .host) .name .host) }}
+{{- end }}
+{{- $_ := set $hosts .host .name }}
+{{- end }}
+{{- if and $routes.gateway.enabled $routes.ingress.enabled }}
+{{- fail "routes: turn on gateway or ingress, not both" }}
+{{- end }}
+{{- if and (or $routes.gateway.enabled $routes.ingress.enabled) (not $backends) }}
+{{- fail "routes: nothing to route; set server.publicUrl, or turn on the webmail or the console" }}
+{{- end }}
+{{- if $routes.gateway.enabled }}
+{{- if not $routes.gateway.parentRefs }}
+{{- fail "routes.gateway.parentRefs: name the Gateway (and listener) to attach to" }}
+{{- end }}
+{{- range $backends }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ printf "%s-%s" $full .name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ .name }}
+  {{- with $routes.gateway.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- toYaml $routes.gateway.parentRefs | nindent 4 }}
+  hostnames:
+    - {{ .host | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ .service }}
+          port: 8080
+{{- end }}
+{{- end }}
+{{- if $routes.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $full }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+  {{- with $routes.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with $routes.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with $routes.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range $backends }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .service }}
+                port:
+                  name: http
+    {{- end }}
+{{- end }}
