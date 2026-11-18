@@ -27,3 +27,9 @@ runs, pinned by digest.
 - `server.seed`: the new store's setup (domain, administrator, blob store,
   coordinator, roles), applied once on install by a pre-install Job running
   the server's `--seed`, before any server pod starts.
+- `server.upgrade`: before an upgrade or rollback rolls out, a Job on the
+  new image asks the server what it does to the store (`--upgrade-plan`).
+  A layout change waits for `upgrade.acknowledgeLayout`. When a layout step
+  can't run with older pods up, the server Deployments are scaled to 0
+  first, which a rolling update can't do. Then `--upgrade-store` upgrades
+  the store.

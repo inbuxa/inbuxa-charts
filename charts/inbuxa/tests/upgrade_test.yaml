@@ -1,0 +1,90 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+suite: upgrade
+templates:
+  - server/upgrade.yaml
+release:
+  name: mail
+  namespace: inbuxa
+values:
+  - ../ci/defaults-values.yaml
+tests:
+  - it: runs before an upgrade or a rollback, the rights first
+    asserts:
+      - hasDocuments:
+          count: 5
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-upgrade,pre-rollback
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "-10"
+        documentIndex: 1
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "0"
+        documentIndex: 4
+
+  - it: may scale this release's server Deployments, and nothing else
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: rules[0]
+          value:
+            apiGroups: [apps]
+            resources: [deployments/scale]
+            resourceNames: [mail-inbuxa-front, mail-inbuxa-mta, mail-inbuxa-core]
+            verbs: [get, patch]
+      - lengthEqual:
+          path: rules
+          count: 2
+
+  - it: tells the script the release, the acknowledgement and the groups
+    set:
+      server.upgrade.acknowledgeLayout: 3
+      server.groups.mta.enabled: false
+      server.services.mail.groups: [front]
+    documentIndex: 4
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ACKNOWLEDGE_LAYOUT, value: "3"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: DEPLOYMENTS, value: mail-inbuxa-front mail-inbuxa-core}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: STOP_WAIT_SECONDS, value: "300"}
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: mail-inbuxa-upgrade
+
+  - it: carries the script from files/upgrade.sh
+    documentIndex: 3
+    asserts:
+      - matchRegex:
+          path: data["upgrade.sh"]
+          pattern: inbuxa --upgrade-plan --config
+      - exists:
+          path: data["config.json"]
+
+  - it: needs no rights when it mustn't stop the servers
+    set:
+      server.upgrade.stopServers: false
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+        documentIndex: 1
+      - notExists:
+          path: spec.template.spec.serviceAccountName
+        documentIndex: 1
+
+  - it: can be turned off
+    set:
+      server.upgrade.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

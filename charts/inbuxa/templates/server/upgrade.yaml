@@ -1,0 +1,206 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+Before an upgrade rolls new pods out: a Job on the new image asks the server
+what the upgrade does to the store, refuses a layout change nobody
+acknowledged, stops the server pods when a layout step needs every node
+stopped (a rolling update would stall there), and upgrades the store. The
+script is files/upgrade.sh.
+
+The rights to scale the server Deployments belong to a ServiceAccount that
+exists only while the hook runs. On a rollback the same run refuses a store
+the older release can't read.
+*/}}
+{{- $root := . }}
+{{- $server := .Values.server }}
+{{- $upgrade := $server.upgrade }}
+{{- if $upgrade.enabled }}
+{{- $name := printf "%s-upgrade" (include "inbuxa.fullname" $root) }}
+{{- $deployments := list }}
+{{- range $group := list "front" "mta" "core" }}
+{{- if (index $server.groups $group).enabled }}
+{{- $deployments = append $deployments (printf "%s-%s" (include "inbuxa.fullname" $root) $group) }}
+{{- end }}
+{{- end }}
+{{- $hook := dict "helm.sh/hook" "pre-upgrade,pre-rollback" "helm.sh/hook-delete-policy" "before-hook-creation,hook-succeeded" }}
+{{- if $upgrade.stopServers }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: upgrade
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: upgrade
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+rules:
+  # Scale this release's server Deployments, and nothing else
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    resourceNames:
+      {{- toYaml $deployments | nindent 6 }}
+    verbs: ["get", "patch"]
+  # See when their pods are gone
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: upgrade
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ $root.Release.Namespace }}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: upgrade
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-5") $hook) | nindent 4 }}
+data:
+  config.json: {{ toJson $server.dataStore | quote }}
+  upgrade.sh: |
+    {{- $root.Files.Get "files/upgrade.sh" | nindent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: upgrade
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "0") $hook) | nindent 4 }}
+    ignore-check.kube-linter.io/no-liveness-probe: "A one-shot that serves nothing; activeDeadlineSeconds bounds it"
+    ignore-check.kube-linter.io/no-readiness-probe: "A one-shot that serves nothing"
+    ignore-check.kube-linter.io/restart-policy: "Never on purpose: a failed upgrade is for a person to look at, not to retry"
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ $upgrade.timeoutSeconds }}
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        {{- include "inbuxa.labels" $root | nindent 8 }}
+        app.kubernetes.io/component: upgrade
+    spec:
+      {{- if $upgrade.stopServers }}
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: true
+      {{- else }}
+      automountServiceAccountToken: false
+      {{- end }}
+      enableServiceLinks: false
+      restartPolicy: Never
+      {{- with $root.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 2000
+        runAsGroup: 2000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: upgrade
+          image: {{ include "inbuxa.server.image" $root }}
+          imagePullPolicy: {{ $server.image.pullPolicy }}
+          command: ["/bin/sh", "/etc/inbuxa/upgrade/upgrade.sh"]
+          env:
+            - name: INBUXA_HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: RELEASE
+              value: {{ $root.Release.Name | quote }}
+            - name: NAMESPACE
+              value: {{ $root.Release.Namespace | quote }}
+            - name: DEPLOYMENTS
+              value: {{ join " " $deployments | quote }}
+            - name: ACKNOWLEDGE_LAYOUT
+              value: {{ $upgrade.acknowledgeLayout | quote }}
+            - name: STOP_SERVERS
+              value: {{ $upgrade.stopServers | quote }}
+            - name: STOP_WAIT_SECONDS
+              value: {{ add $server.terminationGracePeriodSeconds 180 | quote }}
+          resources:
+            {{- toYaml (default $server.resources $upgrade.resources) | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: hook
+              mountPath: /etc/inbuxa/config.json
+              subPath: config.json
+              readOnly: true
+            - name: hook
+              mountPath: /etc/inbuxa/upgrade/upgrade.sh
+              subPath: upgrade.sh
+              readOnly: true
+            {{- if $server.secretMounts }}
+            - name: secrets
+              mountPath: /etc/inbuxa/secrets
+              readOnly: true
+            {{- end }}
+            - name: data
+              mountPath: /var/lib/inbuxa
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: hook
+          configMap:
+            name: {{ $name }}
+        {{- if $server.secretMounts }}
+        - name: secrets
+          projected:
+            defaultMode: 0440
+            sources:
+              {{- range $server.secretMounts }}
+              - secret:
+                  name: {{ .secretName }}
+                  items:
+                    {{- toYaml .items | nindent 20 }}
+              {{- end }}
+        {{- end }}
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+{{- end }}
