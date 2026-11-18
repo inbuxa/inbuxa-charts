@@ -1,0 +1,215 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+One Deployment per server role group. Node identity comes from the pod
+(INBUXA_HOSTNAME is the pod name) and node ids from the store, so the pods
+are interchangeable: Deployments, not StatefulSets.
+*/}}
+{{- $root := . }}
+{{- $server := .Values.server }}
+{{- range $group := list "front" "mta" "core" }}
+{{- $g := index $server.groups $group }}
+{{- if $g.enabled }}
+{{- $labels := include "inbuxa.server.selectorLabels" (dict "root" $root "group" $group) }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "inbuxa.fullname" $root }}-{{ $group }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: server
+    inbuxa.org/group: {{ $group }}
+spec:
+  replicas: {{ $g.replicas }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      {{- $labels | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      {{- if eq $group "core" }}
+      # Never two cores at once, not even for a moment during a rollout
+      maxSurge: 0
+      maxUnavailable: 1
+      {{- else }}
+      maxSurge: 1
+      maxUnavailable: 0
+      {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "inbuxa.labels" $root | nindent 8 }}
+        app.kubernetes.io/component: server
+        inbuxa.org/group: {{ $group }}
+        {{- if has $group $server.services.http.groups }}
+        inbuxa.org/serves-http: "true"
+        {{- end }}
+        {{- if and $server.services.mail.enabled (has $group $server.services.mail.groups) }}
+        inbuxa.org/serves-mail: "true"
+        {{- end }}
+      annotations:
+        checksum/config: {{ toJson $server.dataStore | sha256sum }}
+        {{- with $g.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Always
+      terminationGracePeriodSeconds: {{ $server.terminationGracePeriodSeconds }}
+      {{- with $root.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- $lowest := 65536 }}
+        {{- range $name, $port := $server.listeners }}
+        {{- if and (gt (int $port) 0) (lt (int $port) (int $lowest)) }}{{ $lowest = int $port }}{{ end }}
+        {{- end }}
+        {{- if lt (int $lowest) 1024 }}
+        # Lets the unprivileged server listen from the lowest listener port
+        # up, with no capability. Namespaced to the pod, and one of the
+        # sysctls Pod Security "restricted" allows.
+        sysctls:
+          - name: net.ipv4.ip_unprivileged_port_start
+            value: {{ $lowest | quote }}
+        {{- end }}
+        runAsNonRoot: true
+        runAsUser: 2000
+        runAsGroup: 2000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      {{- if or (ne $server.topologySpread.nodes "off") (ne $server.topologySpread.zones "off") }}
+      topologySpreadConstraints:
+        {{- if ne $server.topologySpread.nodes "off" }}
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: {{ $server.topologySpread.nodes }}
+          labelSelector:
+            matchLabels:
+              {{- $labels | nindent 14 }}
+        {{- end }}
+        {{- if ne $server.topologySpread.zones "off" }}
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: {{ $server.topologySpread.zones }}
+          labelSelector:
+            matchLabels:
+              {{- $labels | nindent 14 }}
+        {{- end }}
+      {{- end }}
+      {{- with $g.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $g.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $g.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: server
+          image: {{ include "inbuxa.server.image" $root }}
+          imagePullPolicy: {{ $server.image.pullPolicy }}
+          args: ["--config", "/etc/inbuxa/config.json"]
+          env:
+            - name: INBUXA_HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            {{- if $g.role }}
+            - name: INBUXA_ROLE
+              value: {{ $g.role | quote }}
+            {{- end }}
+            {{- if $server.publicUrl }}
+            - name: INBUXA_PUBLIC_URL
+              value: {{ $server.publicUrl | quote }}
+            {{- end }}
+            - name: INBUXA_LISTENER_PORTS
+              value: {{ include "inbuxa.server.listenerPorts" $root | quote }}
+            {{- with $g.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            {{- range $name := list "smtp" "submissions" "imaps" "pop3s" "sieve" "https" "http" }}
+            {{- $port := int (index $server.listeners $name) }}
+            {{- if $port }}
+            - name: {{ $name }}
+              containerPort: {{ $port }}
+              protocol: TCP
+            {{- end }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /healthz/live
+              port: http
+            periodSeconds: 5
+            # A first start on a new or upgraded store can take a while
+            failureThreshold: 120
+          livenessProbe:
+            httpGet:
+              path: /healthz/live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            # Ready while the data store answers
+            httpGet:
+              path: /healthz/ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml (default $server.resources $g.resources) | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/inbuxa/config.json
+              subPath: config.json
+              readOnly: true
+            {{- if $server.secretMounts }}
+            - name: secrets
+              mountPath: /etc/inbuxa/secrets
+              readOnly: true
+            {{- end }}
+            - name: data
+              mountPath: /var/lib/inbuxa
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "inbuxa.fullname" $root }}-server
+        {{- if $server.secretMounts }}
+        - name: secrets
+          projected:
+            defaultMode: 0440
+            sources:
+              {{- range $server.secretMounts }}
+              - secret:
+                  name: {{ .secretName }}
+                  items:
+                    {{- toYaml .items | nindent 20 }}
+              {{- end }}
+        {{- end }}
+        # Scratch only: everything lasting is in the data store
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+{{- end }}
+{{- end }}

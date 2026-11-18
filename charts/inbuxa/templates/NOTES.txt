@@ -1,4 +1,12 @@
 inbuxa {{ .Chart.AppVersion }} is installed as "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
 
-This chart is in development and creates nothing yet. The guide is at
-https://docs.inbuxa.org/
+The server runs as {{ range $name, $g := .Values.server.groups }}{{ if $g.enabled }}{{ $name }} ({{ $g.replicas }}) {{ end }}{{ end }}on the data store in config.json.
+{{- if .Values.server.services.mail.enabled }}
+
+Mail from outside reaches the {{ .Values.server.services.mail.type }} Service {{ include "inbuxa.fullname" . }}-mail. Its address:
+  kubectl -n {{ .Release.Namespace }} get service {{ include "inbuxa.fullname" . }}-mail
+{{- end }}
+
+This chart is in development. It doesn't yet set up a new store (first
+boot, blob store, coordinator, roles): that is done by hand for now. The
+guide is at https://docs.inbuxa.org/

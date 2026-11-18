@@ -5,4 +5,28 @@
 # left out here with a line saying why.
 checks:
   addAllBuiltIn: true
-  exclude: []
+  exclude:
+    # Style: Kubernetes' own docs order keys by meaning, not alphabetically
+    - sorted-keys
+    # An organisation's own conventions, for the operator to add
+    - required-annotation-email
+    - required-label-owner
+    # Cluster DNS defaults are right for the server
+    - dnsconfig-options
+    # Placement is the operator's choice (nodeSelector/affinity per group)
+    - no-node-affinity
+    # The groups spread with topologySpreadConstraints instead
+    - no-anti-affinity
+    # core runs exactly one replica by design, and front and mta default to 2
+    - minimum-three-replicas
+    # The mail Service is a LoadBalancer on purpose: it is how mail gets in
+    - exposed-services
+    # TODO(K-C4): NetworkPolicies come with the security defaults; take this
+    # line out then
+    - non-isolated-pod
+    # The standard mail ports, on purpose. The pod listens on them with no
+    # capability, through the sysctl below.
+    - privileged-ports
+    # Flags net.ipv4.ip_unprivileged_port_start, which Kubernetes counts as a
+    # safe, namespaced sysctl since 1.22 and Pod Security "restricted" allows
+    - unsafe-sysctls

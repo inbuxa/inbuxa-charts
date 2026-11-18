@@ -1,0 +1,56 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+Mail from outside, on the standard ports, sent to the listeners in the
+pods. With externalTrafficPolicy Local the load balancer sends only to
+nodes running one of these pods, and the server sees each client's own
+address.
+*/}}
+{{- $root := . }}
+{{- $svc := .Values.server.services.mail }}
+{{- if $svc.enabled }}
+{{- range $group := $svc.groups }}
+{{- if not (index $root.Values.server.groups $group).enabled }}
+{{- fail (printf "server.services.mail.groups names %q, which is not enabled" $group) }}
+{{- end }}
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "inbuxa.fullname" . }}-mail
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  {{- with $svc.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $svc.type }}
+  {{- if ne $svc.type "ClusterIP" }}
+  externalTrafficPolicy: {{ $svc.externalTrafficPolicy }}
+  {{- end }}
+  {{- if and (eq $svc.type "LoadBalancer") $svc.loadBalancerClass }}
+  loadBalancerClass: {{ $svc.loadBalancerClass }}
+  {{- end }}
+  {{- if and (eq $svc.type "LoadBalancer") $svc.loadBalancerIP }}
+  loadBalancerIP: {{ $svc.loadBalancerIP }}
+  {{- end }}
+  selector:
+    {{- include "inbuxa.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+    inbuxa.org/serves-mail: "true"
+  ports:
+    {{- range $name := list "smtp" "submissions" "imaps" "pop3s" "sieve" }}
+    {{- $target := int (index $root.Values.server.listeners $name) }}
+    {{- $port := int (index $svc.ports $name) }}
+    {{- if and $target $port }}
+    - name: {{ $name }}
+      port: {{ $port }}
+      targetPort: {{ $name }}
+      protocol: TCP
+    {{- end }}
+    {{- end }}
+{{- end }}

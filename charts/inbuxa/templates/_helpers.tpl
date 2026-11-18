@@ -44,3 +44,30 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/part-of: inbuxa
 {{- end -}}
+
+{{/* The server image, by digest when one is set. */}}
+{{- define "inbuxa.server.image" -}}
+{{- $img := .Values.server.image -}}
+{{- if $img.digest -}}
+{{- printf "%s@%s" $img.repository $img.digest -}}
+{{- else -}}
+{{- printf "%s:%s" $img.repository (default .Chart.AppVersion $img.tag) -}}
+{{- end -}}
+{{- end -}}
+
+{{/* A server group's selector labels. Call with (dict "root" $ "group" "front"). */}}
+{{- define "inbuxa.server.selectorLabels" -}}
+{{ include "inbuxa.selectorLabels" .root }}
+app.kubernetes.io/component: server
+inbuxa.org/group: {{ .group }}
+{{- end -}}
+
+{{/* INBUXA_LISTENER_PORTS: name=port for each listener, off for a 0. */}}
+{{- define "inbuxa.server.listenerPorts" -}}
+{{- $items := list -}}
+{{- range $name := list "smtp" "submissions" "imaps" "pop3s" "sieve" "https" "http" -}}
+{{- $port := int (index $.Values.server.listeners $name) -}}
+{{- $items = append $items (printf "%s=%s" $name (ternary "off" (toString $port) (eq $port 0))) -}}
+{{- end -}}
+{{- join "," $items -}}
+{{- end -}}

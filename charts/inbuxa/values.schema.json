@@ -3,6 +3,97 @@
   "title": "Values for the inbuxa chart",
   "type": "object",
   "additionalProperties": false,
+  "definitions": {
+    "name": {
+      "type": "string",
+      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "listenerPort": {
+      "description": "A port in the pod, or 0 to leave the listener out.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "replicas",
+        "role"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "role": {
+          "description": "The registry ClusterRole the group's pods run as; empty runs every task.",
+          "type": "string"
+        },
+        "resources": {
+          "type": "object"
+        },
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "tolerations": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "affinity": {
+          "type": "object"
+        },
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "extraEnv": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ]
+          }
+        }
+      }
+    },
+    "groupNames": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "front",
+          "mta",
+          "core"
+        ]
+      }
+    },
+    "spreadMode": {
+      "enum": [
+        "DoNotSchedule",
+        "ScheduleAnyway",
+        "off"
+      ]
+    }
+  },
   "properties": {
     "global": {
       "description": "Set by Helm for charts that have subcharts. Unused here.",
@@ -10,15 +101,295 @@
     },
     "nameOverride": {
       "description": "Replaces \"inbuxa\" in the names of everything the chart creates.",
-      "type": "string",
-      "maxLength": 40,
-      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+      "allOf": [
+        {
+          "$ref": "#/definitions/name"
+        },
+        {
+          "maxLength": 40
+        }
+      ]
     },
     "fullnameOverride": {
       "description": "Replaces the whole name: the release name and the chart name.",
-      "type": "string",
-      "maxLength": 52,
-      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+      "allOf": [
+        {
+          "$ref": "#/definitions/name"
+        },
+        {
+          "maxLength": 52
+        }
+      ]
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string",
+              "pattern": "^(sha256:[a-f0-9]{64})?$"
+            },
+            "pullPolicy": {
+              "enum": [
+                "Always",
+                "IfNotPresent",
+                "Never"
+              ]
+            }
+          }
+        },
+        "dataStore": {
+          "description": "The data store, written as config.json. Its secrets are File references.",
+          "type": "object"
+        },
+        "secretMounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "secretName",
+              "items"
+            ],
+            "properties": {
+              "secretName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "items": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "key",
+                    "path"
+                  ],
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "path": {
+                      "type": "string",
+                      "pattern": "^[^/][^\\0]*$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "publicUrl": {
+          "type": "string",
+          "pattern": "^(https?://[^/\\s]+)?$"
+        },
+        "listeners": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "smtp": {
+              "description": "25, or 0 for no SMTP. The server's default rules treat only port 25 as mail from the internet, so SMTP can't move.",
+              "enum": [
+                0,
+                25
+              ]
+            },
+            "submissions": {
+              "$ref": "#/definitions/listenerPort"
+            },
+            "imaps": {
+              "$ref": "#/definitions/listenerPort"
+            },
+            "pop3s": {
+              "$ref": "#/definitions/listenerPort"
+            },
+            "sieve": {
+              "$ref": "#/definitions/listenerPort"
+            },
+            "https": {
+              "$ref": "#/definitions/listenerPort"
+            },
+            "http": {
+              "description": "Plain HTTP, which the probes use, so it can't be left out.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            }
+          }
+        },
+        "groups": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "front": {
+              "$ref": "#/definitions/group"
+            },
+            "mta": {
+              "$ref": "#/definitions/group"
+            },
+            "core": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/group"
+                },
+                {
+                  "properties": {
+                    "replicas": {
+                      "description": "0 or 1: a second core would queue every maintenance task twice.",
+                      "maximum": 1
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "resources": {
+          "type": "object"
+        },
+        "terminationGracePeriodSeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "topologySpread": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "nodes": {
+              "$ref": "#/definitions/spreadMode"
+            },
+            "zones": {
+              "$ref": "#/definitions/spreadMode"
+            }
+          }
+        },
+        "podDisruptionBudget": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "maxUnavailable": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "services": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "http": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "enum": [
+                    "ClusterIP",
+                    "NodePort",
+                    "LoadBalancer"
+                  ]
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "groups": {
+                  "$ref": "#/definitions/groupNames"
+                }
+              }
+            },
+            "mail": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "type": {
+                  "enum": [
+                    "LoadBalancer",
+                    "NodePort",
+                    "ClusterIP"
+                  ]
+                },
+                "externalTrafficPolicy": {
+                  "enum": [
+                    "Local",
+                    "Cluster"
+                  ]
+                },
+                "loadBalancerClass": {
+                  "type": "string"
+                },
+                "loadBalancerIP": {
+                  "type": "string"
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "groups": {
+                  "$ref": "#/definitions/groupNames"
+                },
+                "ports": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "smtp": {
+                      "$ref": "#/definitions/port"
+                    },
+                    "submissions": {
+                      "$ref": "#/definitions/port"
+                    },
+                    "imaps": {
+                      "$ref": "#/definitions/port"
+                    },
+                    "pop3s": {
+                      "$ref": "#/definitions/port"
+                    },
+                    "sieve": {
+                      "$ref": "#/definitions/port"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

@@ -23,14 +23,13 @@ step() { printf '\n== %s\n' "$*"; }
 
 for helm in helm helm3; do
   step "$helm lint ($($helm version --short))"
-  $helm lint --strict "$CHART"
   for values in "$CHART"/ci/*-values.yaml; do
     $helm lint --strict "$CHART" -f "$values"
   done
 done
 
 step "the values schema rejects a key it doesn't know"
-if helm lint --strict "$CHART" --set notAValue=1 >"$OUT/reject.log" 2>&1; then
+if helm lint --strict "$CHART" -f "$CHART/ci/defaults-values.yaml" --set notAValue=1 >"$OUT/reject.log" 2>&1; then
   echo "!! an unknown value was accepted" >&2
   exit 1
 fi
@@ -45,7 +44,7 @@ for values in "$CHART"/ci/*-values.yaml; do
   name="$(basename "$values" -values.yaml)"
   for kube in "${KUBE_VERSIONS[@]}"; do
     step "kubeconform: $name values on Kubernetes $kube"
-    helm template ci "$CHART" -f "$values" --kube-version "$kube" >"$OUT/$name-$kube.yaml"
+    helm template ci "$CHART" -n inbuxa -f "$values" --kube-version "$kube" >"$OUT/$name-$kube.yaml"
     kubeconform -strict -summary -kubernetes-version "$kube" \
       -schema-location default "$OUT/$name-$kube.yaml"
   done

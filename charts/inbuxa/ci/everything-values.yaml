@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Every optional setting turned on, so all of the templates' branches render.
+imagePullSecrets: [{name: registry}]
+server:
+  image:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  dataStore:
+    "@type": PostgreSql
+    host: pg-rw.data.svc
+    port: 5432
+    database: inbuxa
+    authUsername: inbuxa
+    authSecret: {"@type": File, filePath: /etc/inbuxa/secrets/pg-password}
+  secretMounts:
+    - secretName: inbuxa-data
+      items: [{key: pg-password, path: pg-password}, {key: nats-password, path: nats-password}]
+    - secretName: inbuxa-s3
+      items: [{key: secret-key, path: s3-secret-key}]
+  publicUrl: https://mail.example.org
+  listeners:
+    pop3s: 995
+  groups:
+    front:
+      replicas: 3
+      podAnnotations: {example.org/team: mail}
+      extraEnv: [{name: INBUXA_HTTP_FORWARDED_HEADER, value: X-Forwarded-For}]
+    mta:
+      nodeSelector: {example.org/egress: mail}
+      tolerations: [{key: example.org/egress, operator: Exists, effect: NoSchedule}]
+      resources:
+        requests: {cpu: 500m, memory: 1Gi}
+        limits: {cpu: "4", memory: 4Gi}
+    core:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              preference:
+                matchExpressions: [{key: example.org/tier, operator: In, values: [core]}]
+  topologySpread:
+    zones: "off"
+  services:
+    http:
+      annotations: {example.org/scrape: "true"}
+    mail:
+      loadBalancerClass: example.org/lb
+      annotations: {example.org/lb-pool: mail}

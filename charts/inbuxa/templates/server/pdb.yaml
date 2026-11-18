@@ -1,0 +1,32 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+A drain or upgrade takes down at most maxUnavailable pods of a group. For
+the single core that means it can be moved, with a short gap in the
+scheduled tasks, rather than blocking every drain.
+*/}}
+{{- if .Values.server.podDisruptionBudget.enabled }}
+{{- $root := . }}
+{{- range $group := list "front" "mta" "core" }}
+{{- $g := index $root.Values.server.groups $group }}
+{{- if and $g.enabled (gt (int $g.replicas) 0) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "inbuxa.fullname" $root }}-{{ $group }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: server
+    inbuxa.org/group: {{ $group }}
+spec:
+  maxUnavailable: {{ $root.Values.server.podDisruptionBudget.maxUnavailable }}
+  unhealthyPodEvictionPolicy: AlwaysAllow
+  selector:
+    matchLabels:
+      {{- include "inbuxa.server.selectorLabels" (dict "root" $root "group" $group) | nindent 6 }}
+{{- end }}
+{{- end }}
+{{- end }}
