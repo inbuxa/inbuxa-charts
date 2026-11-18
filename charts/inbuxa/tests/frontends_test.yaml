@@ -1,0 +1,215 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+suite: webmail, console and routes
+templates:
+  - webmail.yaml
+  - console.yaml
+  - routes.yaml
+  - server/deployment.yaml
+release:
+  name: mail
+  namespace: inbuxa
+values:
+  - ../ci/defaults-values.yaml
+set:
+  server.publicUrl: https://mail.example.org
+  webmail.enabled: true
+  webmail.publicUrl: https://webmail.example.org
+  webmail.image.tag: 27.1-rc.7
+  console.enabled: true
+  console.publicUrl: https://admin.example.org/
+  console.image.tag: 27.1-rc.21
+tests:
+  - it: is off by default
+    set:
+      webmail.enabled: false
+      console.enabled: false
+    template: webmail.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: runs the webmail with sealed-cookie sessions, talking to the server inside the cluster
+    template: webmail.yaml
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/inbuxa/inbuxa-webmail:27.1-rc.7
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MAIL_SERVER_URL, value: "http://mail-inbuxa-http.inbuxa.svc:8080"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: SESSION_BACKEND, value: cookie}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: SECURE_COOKIES, value: "1"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: ADMIN_URL, value: "https://admin.example.org"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OAUTH_CLIENT_SECRET
+            valueFrom: {secretKeyRef: {name: mail-inbuxa-webmail, key: oauth-client-secret}}
+      - equal:
+          path: spec.replicas
+          value: 2
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+
+  - it: makes the webmail's secrets when none is given
+    template: webmail.yaml
+    documentSelector:
+      path: kind
+      value: Secret
+    asserts:
+      - exists:
+          path: data["app-secret"]
+      - exists:
+          path: data["oauth-client-secret"]
+
+  - it: uses the operator's Secret when given one
+    template: webmail.yaml
+    set:
+      webmail.existingSecret: my-webmail
+    asserts:
+      - hasDocuments:
+          count: 3
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: APP_SECRET
+            valueFrom: {secretKeyRef: {name: my-webmail, key: app-secret}}
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: tells every server pod about the webmail and the console, so it registers them
+    template: server/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_WEBMAIL_URL, value: "https://webmail.example.org"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: INBUXA_WEBMAIL_CLIENT_SECRET
+            valueFrom: {secretKeyRef: {name: mail-inbuxa-webmail, key: oauth-client-secret}}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_ADMIN_URL, value: "https://admin.example.org"}
+
+  - it: points the console's browser at the server
+    template: console.yaml
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value: [{name: API_BASE_URL, value: "https://mail.example.org"}]
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 101
+
+  - it: scales with an autoscaler instead of a fixed count
+    template: webmail.yaml
+    set:
+      webmail.autoscaling.enabled: true
+    asserts:
+      - notExists:
+          path: spec.replicas
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.minReplicas
+          value: 2
+        documentSelector:
+          path: kind
+          value: HorizontalPodAutoscaler
+
+  - it: needs a release to run, an address, and the server's address
+    template: webmail.yaml
+    set:
+      webmail.image.tag: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: "webmail.image.tag: set the webmail release"
+
+  - it: refuses an address with a path (the schema)
+    template: console.yaml
+    set:
+      console.publicUrl: https://example.org/admin
+    asserts:
+      - failedTemplate:
+          errorPattern: "console.publicUrl"
+
+  - it: needs the server's publicUrl
+    template: webmail.yaml
+    set:
+      server.publicUrl: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: "set server.publicUrl too"
+
+  - it: routes each address to its Service through a Gateway
+    template: routes.yaml
+    set:
+      routes.gateway.enabled: true
+      routes.gateway.parentRefs: [{name: public, namespace: gateway}]
+    asserts:
+      - hasDocuments:
+          count: 3
+      - equal:
+          path: spec.hostnames
+          value: [webmail.example.org]
+        documentIndex: 1
+      - equal:
+          path: spec.rules[0].backendRefs[0]
+          value: {name: mail-inbuxa-webmail, port: 8080}
+        documentIndex: 1
+      - equal:
+          path: spec.parentRefs
+          value: [{name: public, namespace: gateway}]
+        documentIndex: 2
+
+  - it: or through one Ingress
+    template: routes.yaml
+    set:
+      routes.ingress.enabled: true
+      routes.ingress.className: nginx
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.rules[0].host
+          value: mail.example.org
+      - equal:
+          path: spec.rules[1].host
+          value: webmail.example.org
+      - equal:
+          path: spec.rules[2].http.paths[0].backend.service.name
+          value: mail-inbuxa-console
+
+  - it: refuses two front ends on one host name
+    template: routes.yaml
+    set:
+      console.publicUrl: https://webmail.example.org
+      routes.ingress.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "webmail and console both have the host webmail.example.org"
+
+  - it: refuses a Gateway route with nothing to attach to
+    template: routes.yaml
+    set:
+      routes.gateway.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "routes.gateway.parentRefs"

@@ -184,3 +184,98 @@ server:
         imaps: 993
         pop3s: 995
         sieve: 4190
+
+# The webmail, signing people in through the server's own page (OAuth). Off
+# by default: it needs its own address, and the server's publicUrl.
+webmail:
+  enabled: false
+  image:
+    repository: ghcr.io/inbuxa/inbuxa-webmail
+    # The webmail's own release (27.1-rc.N); it's versioned apart from the
+    # server, so there's no default. Needs 27.1-rc.7 or later.
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  # Where browsers reach it, as https://host. Required. The server registers
+  # it as an OAuth client with this address.
+  publicUrl: ""
+  replicas: 2
+  # A Secret with app-secret (seals sessions; the same on every replica) and
+  # oauth-client-secret (the server holds it too), and optionally
+  # app-secret-previous (comma-separated secrets that still open sessions
+  # after a rotation). Empty: the chart makes one with random values and
+  # keeps them across upgrades.
+  existingSecret: ""
+  # Addresses whose X-Forwarded-For the webmail believes, as CIDRs. Empty:
+  # the private ranges, which covers an ingress inside the cluster.
+  trustedProxies: []
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  extraEnv: []
+
+# INBUXA Admin, the console, served as static files; the browser talks to
+# the server's publicUrl directly. Off by default, like the webmail.
+console:
+  enabled: false
+  image:
+    repository: ghcr.io/inbuxa/inbuxa-admin
+    # The console's own release (27.1-rc.N); no default, as for the webmail
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  # Where browsers reach it, as https://host. Required. The server registers
+  # it as an OAuth client and lets its origin call the API.
+  publicUrl: ""
+  replicas: 2
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+
+# Routes from outside to the server's publicUrl, the webmail's and the
+# console's, each by its host name. Gateway API where the cluster has it;
+# an Ingress where it doesn't. TLS is the Gateway's or the Ingress's.
+routes:
+  gateway:
+    enabled: false
+    # The Gateway listeners to attach to, e.g. [{name: public, namespace: gateway}]
+    parentRefs: []
+    annotations: {}
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    # As an Ingress takes it, e.g. [{hosts: [mail.example.org], secretName: mail-tls}]
+    tls: []

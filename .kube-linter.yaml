@@ -19,6 +19,9 @@ checks:
     - no-anti-affinity
     # core runs exactly one replica by design, and front and mta default to 2
     - minimum-three-replicas
+    # Likewise for the webmail's and the console's autoscalers: two across
+    # nodes, with a PDB, is the floor; an operator may raise it
+    - hpa-minimum-three-replicas
     # The mail Service is a LoadBalancer on purpose: it is how mail gets in
     - exposed-services
     # TODO(K-C4): NetworkPolicies come with the security defaults; take this

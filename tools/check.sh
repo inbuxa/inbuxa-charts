@@ -45,8 +45,11 @@ for values in "$CHART"/ci/*-values.yaml; do
   for kube in "${KUBE_VERSIONS[@]}"; do
     step "kubeconform: $name values on Kubernetes $kube"
     helm template ci "$CHART" -n inbuxa -f "$values" --kube-version "$kube" >"$OUT/$name-$kube.yaml"
+    # HTTPRoute is a CRD: its schema comes from the CRDs catalog
     kubeconform -strict -summary -kubernetes-version "$kube" \
-      -schema-location default "$OUT/$name-$kube.yaml"
+      -schema-location default \
+      -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+      "$OUT/$name-$kube.yaml"
   done
   step "kube-linter: $name values"
   rendered="$OUT/$name-${KUBE_VERSIONS[-1]}.yaml"

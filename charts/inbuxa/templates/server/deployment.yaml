@@ -22,6 +22,15 @@ metadata:
     {{- include "inbuxa.labels" $root | nindent 4 }}
     app.kubernetes.io/component: server
     inbuxa.org/group: {{ $group }}
+  {{- with $root.Values.webmail }}
+  {{- if .enabled }}
+  annotations:
+    ignore-check.kube-linter.io/read-secret-from-env-var: "TODO(K-S2): the webmail's OAuth client secret comes from the environment until the server takes *_FILE"
+    {{- if .existingSecret }}
+    ignore-check.kube-linter.io/env-value-from: "webmail.existingSecret is the operator's, made outside the chart"
+    {{- end }}
+  {{- end }}
+  {{- end }}
 spec:
   replicas: {{ $g.replicas }}
   revisionHistoryLimit: 5
@@ -135,6 +144,22 @@ spec:
             {{- end }}
             - name: INBUXA_LISTENER_PORTS
               value: {{ include "inbuxa.server.listenerPorts" $root | quote }}
+            {{- /* The front ends, registered as OAuth clients on every start */}}
+            {{- with $root.Values.webmail }}
+            {{- if .enabled }}
+            - name: INBUXA_WEBMAIL_URL
+              value: {{ trimSuffix "/" .publicUrl | quote }}
+            - name: INBUXA_WEBMAIL_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (printf "%s-webmail" (include "inbuxa.fullname" $root)) .existingSecret }}
+                  key: oauth-client-secret
+            {{- end }}
+            {{- end }}
+            {{- if $root.Values.console.enabled }}
+            - name: INBUXA_ADMIN_URL
+              value: {{ trimSuffix "/" $root.Values.console.publicUrl | quote }}
+            {{- end }}
             {{- with $g.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

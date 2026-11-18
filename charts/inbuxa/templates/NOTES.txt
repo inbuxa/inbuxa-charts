@@ -7,6 +7,18 @@ Mail from outside reaches the {{ .Values.server.services.mail.type }} Service {{
   kubectl -n {{ .Release.Namespace }} get service {{ include "inbuxa.fullname" . }}-mail
 {{- end }}
 
+{{- if .Values.webmail.enabled }}
+
+The webmail ({{ .Values.webmail.replicas }} replicas) is at {{ .Values.webmail.publicUrl }}.
+{{- end }}
+{{- if .Values.console.enabled }}
+The console is at {{ .Values.console.publicUrl }}.
+{{- end }}
+{{- if and (or .Values.webmail.enabled .Values.console.enabled) (not (or .Values.routes.gateway.enabled .Values.routes.ingress.enabled)) }}
+No routes are turned on (routes.gateway or routes.ingress): route those
+addresses, and the server's, to the Services yourself.
+{{- end }}
+
 {{ if .Values.server.seed.enabled -}}
 The store was set up from server.seed before the server started (once: a
 store that was set up already is left as it is).

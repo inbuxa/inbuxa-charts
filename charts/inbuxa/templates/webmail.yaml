@@ -1,0 +1,248 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+The webmail. Sessions are sealed into the browser's cookie (SESSION_BACKEND
+cookie), so any replica serves any request, and sign-in goes through the
+server's own page (OAuth): the webmail never holds a password. It talks to
+the server inside the cluster, through the HTTP Service.
+*/}}
+{{- $root := . }}
+{{- $wm := .Values.webmail }}
+{{- if $wm.enabled }}
+{{- include "inbuxa.frontEnd.checkUrl" (dict "url" $wm.publicUrl "name" "webmail") }}
+{{- if not .Values.server.publicUrl }}
+{{- fail "webmail: set server.publicUrl too; sign-in sends the browser to the server's page there" }}
+{{- end }}
+{{- $name := printf "%s-webmail" (include "inbuxa.fullname" $root) }}
+{{- $secretName := default $name $wm.existingSecret }}
+{{- if not $wm.existingSecret }}
+{{- /* Random once, then kept: a new APP_SECRET would sign everybody out */}}
+{{- $existing := (lookup "v1" "Secret" $root.Release.Namespace $name).data | default dict }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: webmail
+type: Opaque
+data:
+  app-secret: {{ index $existing "app-secret" | default (randAlphaNum 48 | b64enc) }}
+  oauth-client-secret: {{ index $existing "oauth-client-secret" | default (randAlphaNum 48 | b64enc) }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: webmail
+  annotations:
+    ignore-check.kube-linter.io/read-secret-from-env-var: "TODO(K-W4): the webmail reads its secrets from the environment until it takes *_FILE"
+    {{- if $wm.existingSecret }}
+    ignore-check.kube-linter.io/env-value-from: "existingSecret is the operator's, made outside the chart"
+    {{- end }}
+spec:
+  {{- if not $wm.autoscaling.enabled }}
+  replicas: {{ $wm.replicas }}
+  {{- end }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "inbuxa.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: webmail
+  template:
+    metadata:
+      labels:
+        {{- include "inbuxa.labels" $root | nindent 8 }}
+        app.kubernetes.io/component: webmail
+      {{- with $wm.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Always
+      {{- with $root.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        # node, in the image
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "inbuxa.selectorLabels" $root | nindent 14 }}
+              app.kubernetes.io/component: webmail
+      {{- with $wm.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $wm.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $wm.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: webmail
+          image: {{ include "inbuxa.frontEnd.image" (dict "image" $wm.image "name" "webmail") }}
+          imagePullPolicy: {{ $wm.image.pullPolicy }}
+          env:
+            - name: MAIL_SERVER_URL
+              value: {{ printf "http://%s-http.%s.svc:8080" (include "inbuxa.fullname" $root) $root.Release.Namespace | quote }}
+            - name: PUBLIC_URL
+              value: {{ trimSuffix "/" $wm.publicUrl | quote }}
+            {{- if $root.Values.console.enabled }}
+            - name: ADMIN_URL
+              value: {{ trimSuffix "/" $root.Values.console.publicUrl | quote }}
+            {{- end }}
+            - name: SESSION_BACKEND
+              value: cookie
+            # Nothing on disk: the session is in the cookie
+            - name: SESSION_FILE
+              value: ""
+            - name: SECURE_COOKIES
+              value: {{ ternary "1" "0" (hasPrefix "https://" $wm.publicUrl) | quote }}
+            {{- with $wm.trustedProxies }}
+            - name: TRUSTED_PROXIES
+              value: {{ join "," . | quote }}
+            {{- end }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: APP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: app-secret
+            - name: APP_SECRET_PREVIOUS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: app-secret-previous
+                  optional: true
+            - name: OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: oauth-client-secret
+            {{- with $wm.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml $wm.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: webmail
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "inbuxa.selectorLabels" $root | nindent 4 }}
+    app.kubernetes.io/component: webmail
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+{{- if $wm.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: webmail
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $name }}
+  minReplicas: {{ $wm.autoscaling.minReplicas }}
+  maxReplicas: {{ $wm.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $wm.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}
+{{- if and $wm.podDisruptionBudget.enabled (or $wm.autoscaling.enabled (gt (int $wm.replicas) 1)) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: webmail
+spec:
+  unhealthyPodEvictionPolicy: AlwaysAllow
+  maxUnavailable: {{ $wm.podDisruptionBudget.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "inbuxa.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: webmail
+{{- end }}
+{{- end }}

@@ -71,3 +71,37 @@ inbuxa.org/group: {{ .group }}
 {{- end -}}
 {{- join "," $items -}}
 {{- end -}}
+
+{{/*
+A front end's image, by digest when one is set. Its tag has no default: the
+webmail and the console are versioned apart from the server. Call with
+(dict "image" .Values.webmail.image "name" "webmail").
+*/}}
+{{- define "inbuxa.frontEnd.image" -}}
+{{- $img := .image -}}
+{{- if $img.digest -}}
+{{- printf "%s@%s" $img.repository $img.digest -}}
+{{- else if $img.tag -}}
+{{- printf "%s:%s" $img.repository $img.tag -}}
+{{- else -}}
+{{- fail (printf "%s.image.tag: set the %s release to run (27.1-rc.N); it's versioned apart from the server" .name .name) -}}
+{{- end -}}
+{{- end -}}
+
+{{/* The host name of an https://host[:port] address. */}}
+{{- define "inbuxa.hostOf" -}}
+{{- (urlParse .).hostname | default (regexReplaceAll ":[0-9]+$" (urlParse .).host "") -}}
+{{- end -}}
+
+{{/*
+Checks a front end's publicUrl: required, and http(s)://host with no path.
+Call with (dict "url" .Values.webmail.publicUrl "name" "webmail").
+*/}}
+{{- define "inbuxa.frontEnd.checkUrl" -}}
+{{- if not .url -}}
+{{- fail (printf "%s.publicUrl: set where browsers reach the %s, as https://host" .name .name) -}}
+{{- end -}}
+{{- if not (regexMatch "^https?://[A-Za-z0-9.-]+(:[0-9]+)?/?$" .url) -}}
+{{- fail (printf "%s.publicUrl: %q should be https://host, with no path" .name .url) -}}
+{{- end -}}
+{{- end -}}
