@@ -137,11 +137,25 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content: {name: INBUXA_WEBMAIL_URL, value: "https://webmail.example.org"}
+      # From a file, never the environment
       - contains:
           path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_WEBMAIL_CLIENT_SECRET_FILE, value: /etc/inbuxa/webmail/oauth-client-secret}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_WEBMAIL_CLIENT_SECRET}
+          any: true
+      - contains:
+          path: spec.template.spec.volumes
           content:
-            name: INBUXA_WEBMAIL_CLIENT_SECRET
-            valueFrom: {secretKeyRef: {name: mail-inbuxa-webmail, key: oauth-client-secret}}
+            name: webmail
+            secret:
+              secretName: mail-inbuxa-webmail
+              defaultMode: 0440
+              items: [{key: oauth-client-secret, path: oauth-client-secret}]
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content: {name: webmail, mountPath: /etc/inbuxa/webmail, readOnly: true}
       - contains:
           path: spec.template.spec.containers[0].env
           content: {name: INBUXA_ADMIN_URL, value: "https://admin.example.org"}

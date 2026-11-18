@@ -42,7 +42,8 @@ runs, pinned by digest.
   environment; `webmail.previousAppSecret` reads the old app secret during a
   rotation. The webmail checks its read-only root at start (`IMMUTABLE`).
   Every server pod is told both addresses, so it registers them as OAuth
-  clients.
+  clients; the webmail's client secret reaches the server as a mounted file
+  too (`INBUXA_WEBMAIL_CLIENT_SECRET_FILE`), never the environment.
 - `routes`: the server's, the webmail's and the console's public addresses,
   each by host name, as Gateway API HTTPRoutes or one Ingress.
 - `networkPolicy`, on by default: every pod starts from deny all, in and
