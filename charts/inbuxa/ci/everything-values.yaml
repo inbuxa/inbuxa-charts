@@ -47,3 +47,17 @@ server:
     mail:
       loadBalancerClass: example.org/lb
       annotations: {example.org/lb-pool: mail}
+  seed:
+    enabled: true
+    request:
+      using: ["urn:ietf:params:jmap:core", "urn:inbuxa:jmap:registry"]
+      methodCalls:
+        - ["x:Domain/set", {create: {d: {name: example.org, dkimManagement: {"@type": Automatic}}}}, "domain"]
+        - ["x:Account/set", {create: {admin: {"@type": User, name: admin, domainId: "#d", roles: {"@type": Admin},
+            credentials: {"0": {"@type": Password, secret: {"$file": /etc/inbuxa/seed-secrets/admin-password}}}}}}, "admin"]
+    secretMounts:
+      - secretName: inbuxa-seed
+        items: [{key: admin-password, path: admin-password}]
+    resources:
+      requests: {cpu: 100m, memory: 256Mi}
+      limits: {cpu: "1", memory: 1Gi}

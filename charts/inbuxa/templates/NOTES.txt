@@ -7,6 +7,13 @@ Mail from outside reaches the {{ .Values.server.services.mail.type }} Service {{
   kubectl -n {{ .Release.Namespace }} get service {{ include "inbuxa.fullname" . }}-mail
 {{- end }}
 
-This chart is in development. It doesn't yet set up a new store (first
-boot, blob store, coordinator, roles): that is done by hand for now. The
-guide is at https://docs.inbuxa.org/
+{{ if .Values.server.seed.enabled -}}
+The store was set up from server.seed before the server started (once: a
+store that was set up already is left as it is).
+{{- else -}}
+No seed was given (server.seed), so a new store has no domain, administrator
+or cluster roles yet, and the front and mta groups name roles that don't
+exist. Set the seed and install again on an empty store.
+{{- end }}
+
+This chart is in development. The guide is at https://docs.inbuxa.org/

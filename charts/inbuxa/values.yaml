@@ -40,6 +40,25 @@ server:
   #     items: [{key: pg-password, path: pg-password}]
   secretMounts: []
 
+  # The new store's setup, applied once on install, before any server pod
+  # starts: the domain, administrator, blob store, coordinator and cluster
+  # roles the groups below name. A JMAP request body ("using" and
+  # "methodCalls"), the calls an administrator would send to /jmap, run as
+  # the system administrator. A value {"$file": /path} is replaced by that
+  # file's contents: put secrets in seed.secretMounts, never in the seed.
+  # Ignored by a store that's set up already. See the server's --seed.
+  seed:
+    enabled: false
+    # The seed, as values
+    request: {}
+    # Or an existing ConfigMap with it under the key seed.json
+    existingConfigMap: ""
+    # Secrets only the seed run sees, at /etc/inbuxa/seed-secrets, in the
+    # same form as secretMounts
+    secretMounts: []
+    timeoutSeconds: 600
+    resources: {}
+
   # Where browsers and clients reach the server, as https://host. Sign-in
   # pages and OAuth metadata name it.
   publicUrl: ""

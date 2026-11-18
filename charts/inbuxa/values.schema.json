@@ -92,6 +92,45 @@
         "ScheduleAnyway",
         "off"
       ]
+    },
+    "secretMounts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "secretName",
+          "items"
+        ],
+        "properties": {
+          "secretName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "key",
+                "path"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^[^/][^\\0]*$"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "properties": {
@@ -168,41 +207,31 @@
           "type": "object"
         },
         "secretMounts": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "secretName",
-              "items"
-            ],
-            "properties": {
-              "secretName": {
-                "type": "string",
-                "minLength": 1
-              },
-              "items": {
-                "type": "array",
-                "minItems": 1,
-                "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "key",
-                    "path"
-                  ],
-                  "properties": {
-                    "key": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "path": {
-                      "type": "string",
-                      "pattern": "^[^/][^\\0]*$"
-                    }
-                  }
-                }
-              }
+          "$ref": "#/definitions/secretMounts"
+        },
+        "seed": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "request": {
+              "description": "A JMAP request body: using and methodCalls.",
+              "type": "object"
+            },
+            "existingConfigMap": {
+              "type": "string"
+            },
+            "secretMounts": {
+              "$ref": "#/definitions/secretMounts"
+            },
+            "timeoutSeconds": {
+              "type": "integer",
+              "minimum": 30
+            },
+            "resources": {
+              "type": "object"
             }
           }
         },

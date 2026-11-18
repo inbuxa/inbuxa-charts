@@ -24,3 +24,6 @@ runs, pinned by digest.
 - A `mail` LoadBalancer Service (front and mta, client addresses kept) and an
   `http` ClusterIP Service (front and core), PodDisruptionBudgets, and
   spreading across nodes and zones.
+- `server.seed`: the new store's setup (domain, administrator, blob store,
+  coordinator, roles), applied once on install by a pre-install Job running
+  the server's `--seed`, before any server pod starts.
