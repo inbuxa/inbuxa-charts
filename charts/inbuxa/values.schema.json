@@ -235,6 +235,30 @@
             }
           }
         },
+        "upgrade": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "acknowledgeLayout": {
+              "description": "The store layout version an upgrade may move the store to; 0 for none.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "stopServers": {
+              "type": "boolean"
+            },
+            "timeoutSeconds": {
+              "type": "integer",
+              "minimum": 60
+            },
+            "resources": {
+              "type": "object"
+            }
+          }
+        },
         "publicUrl": {
           "type": "string",
           "pattern": "^(https?://[^/\\s]+)?$"

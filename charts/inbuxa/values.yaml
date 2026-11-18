@@ -59,6 +59,23 @@ server:
     timeoutSeconds: 600
     resources: {}
 
+  # Before an upgrade rolls new pods out, a Job on the new image asks the
+  # server what the upgrade does to the store, and upgrades it. Give
+  # `helm upgrade` a --timeout long enough for it: 20m covers a layout step
+  # that has to wait for the old pods' heartbeats to run out.
+  upgrade:
+    enabled: true
+    # A change to the store's layout can't be undone without a backup taken
+    # before it. The upgrade refuses one until this names the layout version
+    # it moves to (the refusal says which): 3 for the 27.1 crossing.
+    acknowledgeLayout: 0
+    # When a layout step needs every server pod stopped, scale the server
+    # Deployments to 0 first (mail is down until the rollout). Off: the
+    # upgrade waits for them to stop, and fails if they don't.
+    stopServers: true
+    timeoutSeconds: 1800
+    resources: {}
+
   # Where browsers and clients reach the server, as https://host. Sign-in
   # pages and OAuth metadata name it.
   publicUrl: ""
