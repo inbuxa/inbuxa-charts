@@ -263,6 +263,12 @@
           "type": "string",
           "pattern": "^(https?://[^/\\s]+)?$"
         },
+        "trustedProxies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "listeners": {
           "type": "object",
           "additionalProperties": false,
