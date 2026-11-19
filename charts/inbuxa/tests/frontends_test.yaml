@@ -50,17 +50,40 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content: {name: ADMIN_URL, value: "https://admin.example.org"}
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: OAUTH_CLIENT_SECRET
-            valueFrom: {secretKeyRef: {name: mail-inbuxa-webmail, key: oauth-client-secret}}
       - equal:
           path: spec.replicas
           value: 2
       - equal:
           path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
           value: true
+
+  - it: gives the webmail its secrets as files, and has it check its read-only root
+    template: webmail.yaml
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: APP_SECRET_FILE, value: /etc/inbuxa-webmail/app-secret}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: OAUTH_CLIENT_SECRET_FILE, value: /etc/inbuxa-webmail/oauth-client-secret}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: IMMUTABLE, value: "1"}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: APP_SECRET_PREVIOUS_FILE, value: /etc/inbuxa-webmail/app-secret-previous}
+      - contains:
+          path: spec.template.spec.volumes
+          content: {name: secrets, secret: {secretName: mail-inbuxa-webmail, defaultMode: 0440}}
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content: {name: secrets, mountPath: /etc/inbuxa-webmail, readOnly: true}
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 1000
 
   - it: makes the webmail's secrets when none is given
     template: webmail.yaml
@@ -81,13 +104,32 @@ tests:
       - hasDocuments:
           count: 3
       - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: APP_SECRET
-            valueFrom: {secretKeyRef: {name: my-webmail, key: app-secret}}
+          path: spec.template.spec.volumes
+          content: {name: secrets, secret: {secretName: my-webmail, defaultMode: 0440}}
         documentSelector:
           path: kind
           value: Deployment
+
+  - it: reads the old app secret while rotating, from the operator's Secret only
+    template: webmail.yaml
+    set:
+      webmail.existingSecret: my-webmail
+      webmail.previousAppSecret: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: APP_SECRET_PREVIOUS_FILE, value: /etc/inbuxa-webmail/app-secret-previous}
+
+  - it: refuses previousAppSecret on the chart's own Secret
+    template: webmail.yaml
+    set:
+      webmail.previousAppSecret: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "previousAppSecret needs webmail.existingSecret"
 
   - it: tells every server pod about the webmail and the console, so it registers them
     template: server/deployment.yaml

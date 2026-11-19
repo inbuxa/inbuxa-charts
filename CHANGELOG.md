@@ -38,7 +38,10 @@ runs, pinned by digest.
   webmail keeps sessions in sealed cookies, so any replica serves any
   request, and signs in through the server's page. Its app and OAuth client
   secrets are a Secret the chart makes (kept across upgrades) or
-  `webmail.existingSecret`. Every server pod is told both addresses, so it
-  registers them as OAuth clients.
+  `webmail.existingSecret`, mounted as files rather than set in its
+  environment; `webmail.previousAppSecret` reads the old app secret during a
+  rotation. The webmail checks its read-only root at start (`IMMUTABLE`).
+  Every server pod is told both addresses, so it registers them as OAuth
+  clients.
 - `routes`: the server's, the webmail's and the console's public addresses,
   each by host name, as Gateway API HTTPRoutes or one Ingress.

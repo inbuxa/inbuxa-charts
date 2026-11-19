@@ -538,6 +538,9 @@
         "existingSecret": {
           "type": "string"
         },
+        "previousAppSecret": {
+          "type": "boolean"
+        },
         "trustedProxies": {
           "type": "array",
           "items": {
