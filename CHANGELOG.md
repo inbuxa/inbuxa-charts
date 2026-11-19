@@ -65,6 +65,13 @@ runs, pinned by digest.
   address from the PROXY header, believed only from `trustedNetworks`, the
   load balancer's own addresses. It needs `externalTrafficPolicy: Local`, and
   server 27.1-rc.32.
+- A pre-flight check before each server pod starts (`server.check`, on by
+  default): an init container runs `inbuxa --check`, which opens the data
+  store, writes, reads and deletes a small object in the blob store, and
+  connects to NATS. A pod that can't use one stays in `Init:Error`, and its
+  status names the part and why. The server container keeps its last log
+  lines as its termination message too. Needs server 27.1-rc.32: an older
+  server doesn't know `--check`.
 - `networkPolicy`, on by default: every pod starts from deny all, in and
   out, and gets only what it needs. The server takes mail on its listeners
   from anywhere and connects anywhere; `networkPolicy.httpFrom` and

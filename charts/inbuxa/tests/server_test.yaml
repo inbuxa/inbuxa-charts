@@ -309,3 +309,33 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: needs externalTrafficPolicy Local
+
+  - it: checks the data layer before each server pod starts
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: check
+      - equal:
+          path: spec.template.spec.initContainers[0].args
+          value: ["--config", "/etc/inbuxa/config.json", "--check"]
+      - equal:
+          path: spec.template.spec.initContainers[0].terminationMessagePolicy
+          value: FallbackToLogsOnError
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].terminationMessagePolicy
+          value: FallbackToLogsOnError
+
+  - it: leaves the check out when it's turned off
+    template: server/deployment.yaml
+    documentIndex: 0
+    set:
+      server.check.enabled: false
+    asserts:
+      - notExists:
+          path: spec.template.spec.initContainers
+

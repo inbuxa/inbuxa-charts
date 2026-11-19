@@ -287,6 +287,18 @@
             }
           }
         },
+        "check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "resources": {
+              "type": "object"
+            }
+          }
+        },
         "publicUrl": {
           "type": "string",
           "pattern": "^(https?://[^/\\s]+)?$"

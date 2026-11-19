@@ -126,11 +126,51 @@ spec:
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if $server.check.enabled }}
+      initContainers:
+        # The data layer can be used, or the pod's status says which part
+        # can't, and why (server --check: exit 78 bad configuration,
+        # 69 unreachable, 77 credentials refused, 76 TLS failed)
+        - name: check
+          image: {{ include "inbuxa.server.image" $root }}
+          imagePullPolicy: {{ $server.image.pullPolicy }}
+          args: ["--config", "/etc/inbuxa/config.json", "--check"]
+          terminationMessagePolicy: FallbackToLogsOnError
+          env:
+            - name: INBUXA_HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            {{- with $g.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml $server.check.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/inbuxa/config.json
+              subPath: config.json
+              readOnly: true
+            {{- if $server.secretMounts }}
+            - name: secrets
+              mountPath: /etc/inbuxa/secrets
+              readOnly: true
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+      {{- end }}
       containers:
         - name: server
           image: {{ include "inbuxa.server.image" $root }}
           imagePullPolicy: {{ $server.image.pullPolicy }}
           args: ["--config", "/etc/inbuxa/config.json"]
+          # A start that can't open the data store says why on its last lines
+          terminationMessagePolicy: FallbackToLogsOnError
           env:
             - name: INBUXA_HOSTNAME
               valueFrom:
