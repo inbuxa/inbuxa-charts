@@ -430,7 +430,7 @@
         },
         "publicUrl": {
           "type": "string",
-          "pattern": "^(https?://[^/\\s]+)?$"
+          "pattern": "^(https://[^/\\s]+)?$"
         },
         "trustedProxies": {
           "type": "array",
@@ -932,7 +932,7 @@
         },
         "publicUrl": {
           "type": "string",
-          "pattern": "^(https?://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$"
+          "pattern": "^(https://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$"
         },
         "replicas": {
           "type": "integer",
@@ -1040,7 +1040,7 @@
         },
         "publicUrl": {
           "type": "string",
-          "pattern": "^(https?://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$"
+          "pattern": "^(https://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$"
         },
         "replicas": {
           "type": "integer",

@@ -84,6 +84,8 @@ runs, pinned by digest.
   checks resources (requests and limits as quantities) and annotation and
   node-selector maps (strings) too, and `tools/bad-values` holds values the
   chart must refuse before anything is applied, each for a stated reason.
+- The server's, the webmail's and the console's `publicUrl` must be
+  `https://`; plain `http://` is refused.
 - Backups and store checks on a schedule. `server.backup` exports the
   whole store nightly to an S3 bucket (`inbuxa --export s3://...`), streamed
   while the server runs, into a folder per export with `export.json`

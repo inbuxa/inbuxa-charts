@@ -115,14 +115,14 @@ webmail and the console are versioned apart from the server. Call with
 {{- end -}}
 
 {{/*
-Checks a front end's publicUrl: required, and http(s)://host with no path.
+Checks a front end's publicUrl: required, and https://host with no path.
 Call with (dict "url" .Values.webmail.publicUrl "name" "webmail").
 */}}
 {{- define "inbuxa.frontEnd.checkUrl" -}}
 {{- if not .url -}}
 {{- fail (printf "%s.publicUrl: set where browsers reach the %s, as https://host" .name .name) -}}
 {{- end -}}
-{{- if not (regexMatch "^https?://[A-Za-z0-9.-]+(:[0-9]+)?/?$" .url) -}}
+{{- if not (regexMatch "^https://[A-Za-z0-9.-]+(:[0-9]+)?/?$" .url) -}}
 {{- fail (printf "%s.publicUrl: %q should be https://host, with no path" .name .url) -}}
 {{- end -}}
 {{- end -}}

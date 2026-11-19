@@ -118,7 +118,7 @@ Before an upgrade rolls new pods out, a Job on the new image asks the server wha
 
 - **`server.publicUrl`** (string)
   Default: `""`.
-  Allowed: matching `^(https?://[^/\s]+)?$`.
+  Allowed: matching `^(https://[^/\s]+)?$`.
   Where browsers and clients reach the server, as https://host. Sign-in pages and OAuth metadata name it.
 
 - **`server.trustedProxies`** (list of string)
@@ -696,7 +696,7 @@ The webmail, signing people in through the server's own page (OAuth). Off by def
 
 - **`webmail.publicUrl`** (string)
   Default: `""`.
-  Allowed: matching `^(https?://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$`.
+  Allowed: matching `^(https://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$`.
   Where browsers reach it, as https://host. Required. The server registers it as an OAuth client with this address.
 
 - **`webmail.replicas`** (integer)
@@ -802,7 +802,7 @@ INBUXA Admin, the console, served as static files; the browser talks to the serv
 
 - **`console.publicUrl`** (string)
   Default: `""`.
-  Allowed: matching `^(https?://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$`.
+  Allowed: matching `^(https://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$`.
   Where browsers reach it, as https://host. Required. The server registers it as an OAuth client and lets its origin call the API.
 
 - **`console.replicas`** (integer)
