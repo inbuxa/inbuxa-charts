@@ -51,6 +51,13 @@ runs, pinned by digest.
   passwords between all users would ban the ingress for everyone.
   `server.trustedProxies` lists the proxies when the pod network isn't a
   private range. Needs server 27.1-rc.32; older servers ignore it.
+- Mail out from a known address (`server.egress`): with
+  `expectedAddresses` and `checkUrl` set, a Job placed like the mta pods
+  asks which address it leaves from after each install and upgrade, and
+  records the answer on the mta Deployment as an event, a Warning when it
+  isn't one of the expected addresses. It never fails an install. Its token
+  may create events and nothing else. `podLabels` on each server group, for
+  an egress gateway that selects the mta pods.
 - `networkPolicy`, on by default: every pod starts from deny all, in and
   out, and gets only what it needs. The server takes mail on its listeners
   from anywhere and connects anywhere; `networkPolicy.httpFrom` and

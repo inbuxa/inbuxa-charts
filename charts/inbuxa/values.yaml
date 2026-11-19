@@ -119,9 +119,14 @@ server:
       tolerations: []
       affinity: {}
       podAnnotations: {}
+      # Extra labels on the pods, for what selects them by label: an egress
+      # gateway policy, say. Not app.kubernetes.io/ or inbuxa.org/ ones.
+      podLabels: {}
       extraEnv: []
     # As front, plus outbound delivery. Place it where its egress address
-    # is the one your SPF and PTR records name.
+    # is the one your SPF and PTR records name: on nodes with a fixed
+    # address (nodeSelector, tolerations), or behind an egress gateway that
+    # selects it (podLabels). server.egress checks it.
     mta:
       enabled: true
       replicas: 2
@@ -131,6 +136,9 @@ server:
       tolerations: []
       affinity: {}
       podAnnotations: {}
+      # Extra labels on the pods, for what selects them by label: an egress
+      # gateway policy, say. Not app.kubernetes.io/ or inbuxa.org/ ones.
+      podLabels: {}
       extraEnv: []
     # Everything, including the task scheduler. Exactly one replica: a
     # second would queue every maintenance task twice.
@@ -143,7 +151,21 @@ server:
       tolerations: []
       affinity: {}
       podAnnotations: {}
+      # Extra labels on the pods, for what selects them by label: an egress
+      # gateway policy, say. Not app.kubernetes.io/ or inbuxa.org/ ones.
+      podLabels: {}
       extraEnv: []
+
+  # The addresses outbound mail should leave from: the ones with reverse
+  # DNS (PTR) records and in your SPF. When set, a Job placed like the mta
+  # pods asks checkUrl which address it came from after each install and
+  # upgrade, and records the answer on the mta Deployment as an event: a
+  # Warning when it isn't one of these (kubectl get events). checkUrl answers
+  # a GET with the caller's address as plain text; pick one you trust, as it
+  # sees your cluster's address.
+  egress:
+    expectedAddresses: []
+    checkUrl: ""
 
   # Used for every group that sets no resources of its own
   resources:
