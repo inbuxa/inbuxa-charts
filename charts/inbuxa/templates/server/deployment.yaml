@@ -144,6 +144,15 @@ spec:
             {{- end }}
             - name: INBUXA_LISTENER_PORTS
               value: {{ include "inbuxa.server.listenerPorts" $root | quote }}
+            # Reached only through the ingress or gateway and the webmail:
+            # count each client by the address they pass on, so failed
+            # sign-ins and anonymous requests aren't charged to the proxy
+            - name: INBUXA_HTTP_USE_FORWARDED
+              value: "true"
+            {{- with $server.trustedProxies }}
+            - name: INBUXA_HTTP_TRUSTED_PROXIES
+              value: {{ join "," . | quote }}
+            {{- end }}
             {{- /* The front ends, registered as OAuth clients on every start */}}
             {{- with $root.Values.webmail }}
             {{- if .enabled }}

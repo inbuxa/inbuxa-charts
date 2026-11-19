@@ -80,6 +80,14 @@ server:
   # pages and OAuth metadata name it.
   publicUrl: ""
 
+  # The proxies whose X-Forwarded-For the server believes, as CIDRs: the
+  # ingress or gateway, and the webmail. The server reads the header so that
+  # its limits and bans for failed sign-ins count each client, not the proxy.
+  # Empty: loopback and the private ranges, which covers pods on most
+  # clusters. List your pod network here if it isn't private (100.64.0.0/10,
+  # say).
+  trustedProxies: []
+
   # The port in the pod of each listener a new store gets, which is what
   # the Services send traffic to. 0 leaves that listener out. The pods may
   # listen below 1024 without any privilege: they set the namespaced sysctl

@@ -45,6 +45,12 @@ runs, pinned by digest.
   clients.
 - `routes`: the server's, the webmail's and the console's public addresses,
   each by host name, as Gateway API HTTPRoutes or one Ingress.
+- The server counts clients by the address the ingress or gateway and the
+  webmail pass on (`INBUXA_HTTP_USE_FORWARDED`), so failed sign-ins and
+  anonymous requests aren't charged to the proxy: without it, enough wrong
+  passwords between all users would ban the ingress for everyone.
+  `server.trustedProxies` lists the proxies when the pod network isn't a
+  private range. Needs server 27.1-rc.32; older servers ignore it.
 - `networkPolicy`, on by default: every pod starts from deny all, in and
   out, and gets only what it needs. The server takes mail on its listeners
   from anywhere and connects anywhere; `networkPolicy.httpFrom` and

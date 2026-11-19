@@ -236,3 +236,23 @@ tests:
     template: server/deployment.yaml
     asserts:
       - failedTemplate: {}
+
+  - it: counts clients by the address the proxies pass on
+    template: server/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_HTTP_USE_FORWARDED, value: "true"}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_HTTP_TRUSTED_PROXIES}
+          any: true
+
+  - it: trusts the proxies it's given instead of the private ranges
+    template: server/deployment.yaml
+    set:
+      server.trustedProxies: [100.64.0.0/10, 10.0.0.0/8]
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_HTTP_TRUSTED_PROXIES, value: "100.64.0.0/10,10.0.0.0/8"}
