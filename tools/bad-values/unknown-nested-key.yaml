@@ -1,0 +1,4 @@
+# refuses: replica\b|additional propert
+server:
+  groups:
+    front: {replica: 2}

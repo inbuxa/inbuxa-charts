@@ -28,6 +28,27 @@ for helm in helm helm3; do
   done
 done
 
+step "the values reference is current (tools/values-reference.py)"
+python3 tools/values-reference.py --check
+
+step "bad values are refused before anything is applied (tools/bad-values)"
+# Each file's first line names what the refusal has to mention. helm
+# template, as an install renders: the schema and the templates' own checks.
+for bad in tools/bad-values/*.yaml; do
+  want=$(sed -n '1s/^# refuses: //p' "$bad")
+  [ -n "$want" ] || { echo "!! $bad: no '# refuses:' line" >&2; exit 1; }
+  if helm template t "$CHART" -f "$CHART/ci/defaults-values.yaml" -f "$bad" >"$OUT/bad.log" 2>&1; then
+    echo "!! accepted: $bad" >&2
+    exit 1
+  fi
+  grep -Eq "$want" "$OUT/bad.log" || {
+    echo "!! $bad refused, but not for /$want/:" >&2
+    cat "$OUT/bad.log" >&2
+    exit 1
+  }
+  echo "refused: $(basename "$bad" .yaml)"
+done
+
 step "the values schema rejects a key it doesn't know"
 if helm lint --strict "$CHART" -f "$CHART/ci/defaults-values.yaml" --set notAValue=1 >"$OUT/reject.log" 2>&1; then
   echo "!! an unknown value was accepted" >&2

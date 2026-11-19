@@ -1,0 +1,3 @@
+# refuses: stopServers.*(boolean|bool)
+server:
+  upgrade: {stopServers: "yes"}

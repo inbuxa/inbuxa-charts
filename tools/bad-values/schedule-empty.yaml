@@ -1,0 +1,4 @@
+# refuses: schedule
+server:
+  storeCheck:
+    quick: {enabled: true, schedule: ""}

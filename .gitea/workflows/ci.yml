@@ -3,7 +3,8 @@
 #
 # The chart's checks on every pull request and on main: helm lint under
 # Helm 4 and Helm 3, the values schema, kubeconform against the three newest
-# Kubernetes minors, kube-linter, and helm-unittest. All of it is
+# Kubernetes minors, kube-linter, helm-unittest, bad values refused, and
+# the values reference (charts/inbuxa/VALUES.md) current. All of it is
 # tools/check.sh, so a contributor runs exactly this before pushing.
 #
 # Installs on a real cluster are the lab's job (inbuxa-k8s-lab), not this
@@ -38,7 +39,7 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update -qq
-          apt-get install -y -qq --no-install-recommends ca-certificates curl git >/dev/null
+          apt-get install -y -qq --no-install-recommends ca-certificates curl git python3-minimal >/dev/null
       - uses: coffey-labs/actions/checkout@fab0c4d45e0162963965f1555df27b7bed5e20ec
       - run: tools/install-tools.sh
       - run: tools/check.sh

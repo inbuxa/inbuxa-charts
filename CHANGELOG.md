@@ -78,6 +78,14 @@ runs, pinned by digest.
   status names the part and why. The server container keeps its last log
   lines as its termination message too. Needs server 27.1-rc.33: an older
   server doesn't know `--check`.
+- `charts/inbuxa/VALUES.md`, every value with its default and what the
+  schema allows, generated from values.yaml and the schema by
+  `tools/values-reference.py`; CI fails when it's out of date. The schema
+  checks resources (requests and limits as quantities) and annotation and
+  node-selector maps (strings) too, and `tools/bad-values` holds values the
+  chart must refuse before anything is applied, each for a stated reason.
+- The server's, the webmail's and the console's `publicUrl` must be
+  `https://`; plain `http://` is refused.
 - Backups and store checks on a schedule. `server.backup` exports the
   whole store nightly to an S3 bucket (`inbuxa --export s3://...`), streamed
   while the server runs, into a folder per export with `export.json`

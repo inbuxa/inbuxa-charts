@@ -1,0 +1,3 @@
+# refuses: smtp
+server:
+  listeners: {smtp: 70000}

@@ -1,0 +1,3 @@
+# refuses: url
+server:
+  backup: {enabled: true, url: "https://backups.example.com/inbuxa"}

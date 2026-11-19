@@ -1,0 +1,4 @@
+# refuses: memory
+server:
+  resources:
+    requests: {memory: lots}

@@ -1,0 +1,6 @@
+# refuses: publicUrl
+webmail:
+  enabled: true
+  publicUrl: http://webmail.example.com
+server:
+  publicUrl: https://mail.example.com

@@ -40,7 +40,7 @@
           "type": "string"
         },
         "resources": {
-          "type": "object"
+          "$ref": "#/definitions/resources"
         },
         "nodeSelector": {
           "type": "object",
@@ -142,6 +142,103 @@
           }
         }
       }
+    },
+    "resources": {
+      "description": "Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, as quantities (100m, 256Mi).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requests": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cpu": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei|e[0-9]+)?$"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            },
+            "memory": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei|e[0-9]+)?$"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            },
+            "ephemeral-storage": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei|e[0-9]+)?$"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cpu": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei|e[0-9]+)?$"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            },
+            "memory": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei|e[0-9]+)?$"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            },
+            "ephemeral-storage": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei|e[0-9]+)?$"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "stringMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   },
   "properties": {
@@ -242,7 +339,7 @@
               "minimum": 30
             },
             "resources": {
-              "type": "object"
+              "$ref": "#/definitions/resources"
             }
           }
         },
@@ -252,28 +349,53 @@
           "properties": {
             "acmeHosts": {
               "type": "array",
-              "items": {"type": "string", "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"}
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+              }
             },
             "secrets": {
               "type": "array",
-              "items": {"type": "string", "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"}
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+              }
             },
             "certManager": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": {"type": "boolean"},
+                "enabled": {
+                  "type": "boolean"
+                },
                 "issuerRef": {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "name": {"type": "string"},
-                    "kind": {"type": "string", "enum": ["Issuer", "ClusterIssuer"]},
-                    "group": {"type": "string"}
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "Issuer",
+                        "ClusterIssuer"
+                      ]
+                    },
+                    "group": {
+                      "type": "string"
+                    }
                   }
                 },
-                "dnsNames": {"type": "array", "items": {"type": "string"}},
-                "renewBefore": {"type": "string"}
+                "dnsNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "renewBefore": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -315,7 +437,7 @@
               "minimum": 60
             },
             "resources": {
-              "type": "object"
+              "$ref": "#/definitions/resources"
             }
           }
         },
@@ -327,13 +449,13 @@
               "type": "boolean"
             },
             "resources": {
-              "type": "object"
+              "$ref": "#/definitions/resources"
             }
           }
         },
         "publicUrl": {
           "type": "string",
-          "pattern": "^(https?://[^/\\s]+)?$"
+          "pattern": "^(https://[^/\\s]+)?$"
         },
         "trustedProxies": {
           "type": "array",
@@ -403,7 +525,7 @@
           }
         },
         "resources": {
-          "type": "object"
+          "$ref": "#/definitions/resources"
         },
         "terminationGracePeriodSeconds": {
           "type": "integer",
@@ -742,7 +864,7 @@
               "minimum": 0
             },
             "resources": {
-              "type": "object"
+              "$ref": "#/definitions/resources"
             }
           }
         },
@@ -796,7 +918,7 @@
               "minimum": 0
             },
             "resources": {
-              "type": "object"
+              "$ref": "#/definitions/resources"
             }
           }
         }
@@ -835,7 +957,7 @@
         },
         "publicUrl": {
           "type": "string",
-          "pattern": "^(https?://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$"
+          "pattern": "^(https://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$"
         },
         "replicas": {
           "type": "integer",
@@ -864,7 +986,7 @@
           }
         },
         "resources": {
-          "type": "object"
+          "$ref": "#/definitions/resources"
         },
         "podDisruptionBudget": {
           "type": "object",
@@ -882,7 +1004,7 @@
           }
         },
         "nodeSelector": {
-          "type": "object"
+          "$ref": "#/definitions/stringMap"
         },
         "tolerations": {
           "type": "array"
@@ -891,7 +1013,7 @@
           "type": "object"
         },
         "podAnnotations": {
-          "type": "object"
+          "$ref": "#/definitions/stringMap"
         },
         "existingSecret": {
           "type": "string"
@@ -943,7 +1065,7 @@
         },
         "publicUrl": {
           "type": "string",
-          "pattern": "^(https?://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$"
+          "pattern": "^(https://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$"
         },
         "replicas": {
           "type": "integer",
@@ -972,7 +1094,7 @@
           }
         },
         "resources": {
-          "type": "object"
+          "$ref": "#/definitions/resources"
         },
         "podDisruptionBudget": {
           "type": "object",
@@ -990,7 +1112,7 @@
           }
         },
         "nodeSelector": {
-          "type": "object"
+          "$ref": "#/definitions/stringMap"
         },
         "tolerations": {
           "type": "array"
@@ -999,7 +1121,7 @@
           "type": "object"
         },
         "podAnnotations": {
-          "type": "object"
+          "$ref": "#/definitions/stringMap"
         }
       }
     },
@@ -1048,7 +1170,7 @@
               "type": "array"
             },
             "annotations": {
-              "type": "object"
+              "$ref": "#/definitions/stringMap"
             }
           }
         },
@@ -1063,7 +1185,7 @@
               "type": "string"
             },
             "annotations": {
-              "type": "object"
+              "$ref": "#/definitions/stringMap"
             },
             "tls": {
               "type": "array"
