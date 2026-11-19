@@ -22,6 +22,9 @@ server:
   trustedProxies: [10.0.0.0/8, 100.64.0.0/10]
   listeners:
     pop3s: 995
+  egress:
+    expectedAddresses: [198.51.100.7, "2001:db8::7"]
+    checkUrl: https://ip.example.org/
   groups:
     front:
       replicas: 3
@@ -30,6 +33,7 @@ server:
     mta:
       nodeSelector: {example.org/egress: mail}
       tolerations: [{key: example.org/egress, operator: Exists, effect: NoSchedule}]
+      podLabels: {example.org/egress-gateway: mail}
       resources:
         requests: {cpu: 500m, memory: 1Gi}
         limits: {cpu: "4", memory: 4Gi}

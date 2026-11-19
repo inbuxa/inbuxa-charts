@@ -63,6 +63,17 @@
             "type": "string"
           }
         },
+        "podLabels": {
+          "type": "object",
+          "propertyNames": {
+            "not": {
+              "pattern": "^(app\\.kubernetes\\.io|inbuxa\\.org|helm\\.sh)/"
+            }
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "extraEnv": {
           "type": "array",
           "items": {
@@ -232,6 +243,23 @@
             },
             "resources": {
               "type": "object"
+            }
+          }
+        },
+        "egress": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "expectedAddresses": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9a-fA-F.:]+$"
+              }
+            },
+            "checkUrl": {
+              "type": "string",
+              "pattern": "^(https?://\\S+)?$"
             }
           }
         },

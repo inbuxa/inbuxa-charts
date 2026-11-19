@@ -9,7 +9,8 @@ all, in and out; the policies after it open only what each one needs:
   server          its mail listeners and https from   anywhere (networkPolicy.serverEgress
                   anywhere; http from the webmail      narrows it)
                   and from networkPolicy.httpFrom
-  seed, upgrade   nothing                             as the server
+  seed, upgrade,  nothing                             as the server
+  egress-check
   webmail         8080 from networkPolicy.httpFrom    DNS; the server's http port; TCP 80
                                                       and 443 anywhere, for remote images
                                                       and calendars (networkPolicy.webmailInternet)
@@ -82,7 +83,8 @@ spec:
     {{- include "inbuxa.networkPolicy.serverEgress" $root | nindent 4 }}
 ---
 # The seed and upgrade Jobs reach the data store as the server does; the
-# upgrade Job reaches the Kubernetes API too. Nothing connects to them.
+# upgrade Job reaches the Kubernetes API too, and the egress check the API
+# and server.egress.checkUrl. Nothing connects to them.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -95,7 +97,7 @@ spec:
     matchLabels:
       {{- include "inbuxa.selectorLabels" $root | nindent 6 }}
     matchExpressions:
-      - {key: app.kubernetes.io/component, operator: In, values: [seed, upgrade]}
+      - {key: app.kubernetes.io/component, operator: In, values: [seed, upgrade, egress-check]}
   policyTypes: [Ingress, Egress]
   egress:
     {{- include "inbuxa.networkPolicy.serverEgress" $root | nindent 4 }}

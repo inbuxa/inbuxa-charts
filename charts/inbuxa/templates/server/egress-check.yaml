@@ -1,0 +1,170 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+After each install and upgrade, when server.egress.expectedAddresses is set:
+a Job placed like the mta pods (their node selector, tolerations, affinity
+and labels, so an egress gateway that picks them picks it too) asks
+server.egress.checkUrl which address it came from, and records the answer
+on the mta Deployment as an event, a Warning when it isn't one of the
+expected addresses. The script is files/egress-check.sh. It never fails.
+
+Its token may create events in this namespace and nothing else.
+*/}}
+{{- $root := . }}
+{{- $server := .Values.server }}
+{{- $egress := $server.egress }}
+{{- $mta := $server.groups.mta }}
+{{- if and $egress.expectedAddresses $mta.enabled }}
+{{- if not $egress.checkUrl }}
+{{- fail "server.egress.checkUrl is required with server.egress.expectedAddresses: a URL that answers with the caller's address as plain text" }}
+{{- end }}
+{{- $name := printf "%s-egress-check" (include "inbuxa.fullname" $root) }}
+{{- $hook := dict "helm.sh/hook" "post-install,post-upgrade" "helm.sh/hook-delete-policy" "before-hook-creation" }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: egress-check
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: egress-check
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: egress-check
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ $root.Release.Namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: egress-check
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-5") $hook) | nindent 4 }}
+data:
+  egress-check.sh: |
+    {{- $root.Files.Get "files/egress-check.sh" | nindent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: egress-check
+  annotations:
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "0") $hook) | nindent 4 }}
+    ignore-check.kube-linter.io/no-liveness-probe: "A one-shot that serves nothing; activeDeadlineSeconds bounds it"
+    ignore-check.kube-linter.io/no-readiness-probe: "A one-shot that serves nothing"
+    ignore-check.kube-linter.io/restart-policy: "Never on purpose: one answer is enough, and the script never fails"
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        {{- with $mta.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- include "inbuxa.labels" $root | nindent 8 }}
+        app.kubernetes.io/component: egress-check
+    spec:
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: true
+      enableServiceLinks: false
+      restartPolicy: Never
+      {{- with $root.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 2000
+        runAsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with $mta.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $mta.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $mta.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: egress-check
+          image: {{ include "inbuxa.server.image" $root }}
+          imagePullPolicy: {{ $server.image.pullPolicy }}
+          command: ["/bin/sh", "/etc/inbuxa/egress-check.sh"]
+          env:
+            - name: CHECK_URL
+              value: {{ $egress.checkUrl | quote }}
+            - name: EXPECTED
+              value: {{ join " " $egress.expectedAddresses | quote }}
+            - name: NAMESPACE
+              value: {{ $root.Release.Namespace | quote }}
+            - name: DEPLOYMENT
+              value: {{ printf "%s-mta" (include "inbuxa.fullname" $root) | quote }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: script
+              mountPath: /etc/inbuxa/egress-check.sh
+              subPath: egress-check.sh
+              readOnly: true
+      volumes:
+        - name: script
+          configMap:
+            name: {{ $name }}
+{{- end }}

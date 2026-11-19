@@ -1,0 +1,83 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+suite: egress
+templates:
+  - server/egress-check.yaml
+  - server/deployment.yaml
+release:
+  name: mail
+  namespace: inbuxa
+values:
+  - ../ci/defaults-values.yaml
+tests:
+  - it: checks nothing unless the expected addresses are given
+    template: server/egress-check.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: needs a URL to ask
+    template: server/egress-check.yaml
+    set:
+      server.egress.expectedAddresses: [198.51.100.7]
+    asserts:
+      - failedTemplate:
+          errorPattern: checkUrl is required
+
+  - it: runs where the mta pods run, with a token that may only create events
+    template: server/egress-check.yaml
+    set:
+      server.egress.expectedAddresses: [198.51.100.7, "2001:db8::7"]
+      server.egress.checkUrl: https://echo.example.test/ip
+      server.groups.mta.nodeSelector: {pool: mail-out}
+      server.groups.mta.tolerations: [{key: mail-out, operator: Exists, effect: NoSchedule}]
+      server.groups.mta.podLabels: {egress: mail}
+    asserts:
+      - equal:
+          path: rules
+          value: [{apiGroups: [""], resources: [events], verbs: [create]}]
+        documentSelector: {path: kind, value: Role}
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-install,post-upgrade
+        documentSelector: {path: kind, value: Job}
+      - equal:
+          path: spec.template.spec.nodeSelector
+          value: {pool: mail-out}
+        documentSelector: {path: kind, value: Job}
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: mail-out
+        documentSelector: {path: kind, value: Job}
+      - equal:
+          path: spec.template.metadata.labels.egress
+          value: mail
+        documentSelector: {path: kind, value: Job}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: EXPECTED, value: "198.51.100.7 2001:db8::7"}
+        documentSelector: {path: kind, value: Job}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: DEPLOYMENT, value: mail-inbuxa-mta}
+        documentSelector: {path: kind, value: Job}
+
+  - it: labels a group's pods for an egress gateway
+    template: server/deployment.yaml
+    set:
+      server.groups.mta.podLabels: {egress: mail}
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels.egress
+          value: mail
+      - equal:
+          path: spec.template.metadata.labels["inbuxa.org/group"]
+          value: mta
+
+  - it: refuses labels the chart sets itself
+    template: server/deployment.yaml
+    set:
+      server.groups.mta.podLabels: {"inbuxa.org/group": front}
+    asserts:
+      - failedTemplate: {}
