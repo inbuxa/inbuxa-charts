@@ -78,6 +78,10 @@ runs, pinned by digest.
   status names the part and why. The server container keeps its last log
   lines as its termination message too. Needs server 27.1-rc.33: an older
   server doesn't know `--check`.
+- `tools/docs-pages.py --out <dir>` writes the docs' generated Kubernetes
+  pages: the values reference, the Services and their ports, what each
+  network policy lets in and out, and the alerts, from `helm template` with
+  `ci/docs-values.yaml`. CI builds them, so a change that breaks one fails.
 - `charts/inbuxa/VALUES.md`, every value with its default and what the
   schema allows, generated from values.yaml and the schema by
   `tools/values-reference.py`; CI fails when it's out of date. The schema

@@ -31,6 +31,9 @@ done
 step "the values reference is current (tools/values-reference.py)"
 python3 tools/values-reference.py --check
 
+step "the docs' generated Kubernetes pages build (tools/docs-pages.py)"
+python3 tools/docs-pages.py --out "$OUT/docs"
+
 step "bad values are refused before anything is applied (tools/bad-values)"
 # Each file's first line names what the refusal has to mention. helm
 # template, as an install renders: the schema and the templates' own checks.

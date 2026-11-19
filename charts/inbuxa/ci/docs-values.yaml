@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# What tools/docs-pages.py renders the docs' tables from: the defaults, plus
+# the parts most installs turn on (webmail, console, metrics, backups), so
+# every Service, policy and alert shows. Anything else stays at its default.
+server:
+  dataStore:
+    "@type": PostgreSql
+    host: pg-rw.data.svc
+    port: 5432
+    database: inbuxa
+    authUsername: inbuxa
+    authSecret: {"@type": File, filePath: /etc/inbuxa/secrets/pg-password}
+    useTls: true
+  secretMounts:
+    - secretName: inbuxa-data
+      items: [{key: pg-password, path: pg-password}]
+  publicUrl: https://mail.example.org
+  backup:
+    enabled: true
+    url: s3://mail-backups/inbuxa
+    existingSecret: inbuxa-backup-keys
+  storeCheck:
+    quick: {enabled: true}
+    full: {enabled: true}
+  metrics:
+    prometheus:
+      enabled: true
+      serviceMonitor: {enabled: true}
+      rules: {enabled: true}
+webmail:
+  enabled: true
+  image: {tag: 27.1-rc.9}
+  publicUrl: https://webmail.example.org
+  existingSecret: webmail-secrets
+console:
+  enabled: true
+  image: {tag: 27.1-rc.22}
+  publicUrl: https://admin.example.org
