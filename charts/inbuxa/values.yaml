@@ -267,6 +267,26 @@ console:
   affinity: {}
   podAnnotations: {}
 
+# NetworkPolicies: every pod the chart makes denies all traffic in and out
+# except what it needs (templates/networkpolicy.yaml has the map). They need
+# a CNI that enforces them.
+networkPolicy:
+  enabled: true
+  # Who may reach the HTTP ports of the server, the webmail and the console:
+  # your ingress controller or gateway, as NetworkPolicy peers, e.g.
+  #   - namespaceSelector:
+  #       matchLabels: {kubernetes.io/metadata.name: ingress-nginx}
+  # Empty: from anywhere. The webmail always reaches the server.
+  httpFrom: []
+  # Where the server and its Jobs may connect, as NetworkPolicy egress rules,
+  # besides DNS. Empty: anywhere, which a mail server needs to deliver mail
+  # unless it hands everything to a relay. Narrow it to your data store,
+  # relay and the Kubernetes API (for the upgrade Job) if you can.
+  serverEgress: []
+  # The webmail fetches remote images in mail and subscribed calendars over
+  # HTTP and HTTPS. Off: only the server.
+  webmailInternet: true
+
 # Routes from outside to the server's publicUrl, the webmail's and the
 # console's, each by its host name. Gateway API where the cluster has it;
 # an Ingress where it doesn't. TLS is the Gateway's or the Ingress's.

@@ -45,3 +45,10 @@ runs, pinned by digest.
   clients.
 - `routes`: the server's, the webmail's and the console's public addresses,
   each by host name, as Gateway API HTTPRoutes or one Ingress.
+- `networkPolicy`, on by default: every pod starts from deny all, in and
+  out, and gets only what it needs. The server takes mail on its listeners
+  from anywhere and connects anywhere; `networkPolicy.httpFrom` and
+  `networkPolicy.serverEgress` narrow its HTTP port and its egress. The
+  webmail reaches DNS, the server and the web (`networkPolicy.webmailInternet`
+  for remote images); the console reaches nothing. Every pod passes Pod
+  Security "restricted", tested in enforce mode.

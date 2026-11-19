@@ -1,0 +1,128 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+suite: network policies
+templates:
+  - networkpolicy.yaml
+release:
+  name: mail
+  namespace: inbuxa
+values:
+  - ../ci/defaults-values.yaml
+tests:
+  - it: denies everything to every pod of the release first
+    documentSelector:
+      path: metadata.name
+      value: mail-inbuxa-deny-all
+    asserts:
+      - equal:
+          path: spec.podSelector.matchLabels
+          value: {app.kubernetes.io/name: inbuxa, app.kubernetes.io/instance: mail}
+      - equal:
+          path: spec.policyTypes
+          value: [Ingress, Egress]
+      - notExists:
+          path: spec.ingress
+      - notExists:
+          path: spec.egress
+
+  - it: opens the server's listeners to anywhere, and its egress
+    documentSelector:
+      path: metadata.name
+      value: mail-inbuxa-server
+    asserts:
+      - equal:
+          path: spec.ingress[0].ports
+          value:
+            - {port: 25, protocol: TCP}
+            - {port: 465, protocol: TCP}
+            - {port: 993, protocol: TCP}
+            - {port: 4190, protocol: TCP}
+            - {port: 443, protocol: TCP}
+      - equal:
+          path: spec.ingress[1]
+          value: {ports: [{port: 8080, protocol: TCP}]}
+      - equal:
+          path: spec.egress
+          value: [{}]
+
+  - it: lets only httpFrom and the webmail reach the server's http port when httpFrom is set
+    set:
+      webmail.enabled: true
+      webmail.publicUrl: https://webmail.example.org
+      webmail.image.tag: 27.1-rc.7
+      server.publicUrl: https://mail.example.org
+      networkPolicy.httpFrom:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ingress}}
+    documentSelector:
+      path: metadata.name
+      value: mail-inbuxa-server
+    asserts:
+      - equal:
+          path: spec.ingress[1].from
+          value:
+            - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ingress}}
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: inbuxa
+                  app.kubernetes.io/instance: mail
+                  app.kubernetes.io/component: webmail
+
+  - it: narrows the server and the Jobs to DNS and serverEgress
+    set:
+      networkPolicy.serverEgress:
+        - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: data}}}]
+    asserts:
+      - equal:
+          path: spec.egress
+          value:
+            - ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+            - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: data}}}]
+        documentSelector:
+          path: metadata.name
+          value: mail-inbuxa-jobs
+
+  - it: lets the webmail reach DNS, the server and the web, and the console nothing
+    set:
+      server.publicUrl: https://mail.example.org
+      webmail.enabled: true
+      webmail.publicUrl: https://webmail.example.org
+      webmail.image.tag: 27.1-rc.7
+      console.enabled: true
+      console.publicUrl: https://admin.example.org
+      console.image.tag: 27.1-rc.21
+    asserts:
+      - equal:
+          path: spec.egress[1].ports
+          value: [{port: 8080, protocol: TCP}]
+        documentSelector: {path: metadata.name, value: mail-inbuxa-webmail}
+      - equal:
+          path: spec.egress[2].ports
+          value: [{port: 80, protocol: TCP}, {port: 443, protocol: TCP}]
+        documentSelector: {path: metadata.name, value: mail-inbuxa-webmail}
+      - equal:
+          path: spec.policyTypes
+          value: [Ingress, Egress]
+        documentSelector: {path: metadata.name, value: mail-inbuxa-console}
+      - notExists:
+          path: spec.egress
+        documentSelector: {path: metadata.name, value: mail-inbuxa-console}
+
+  - it: keeps the webmail off the web with webmailInternet off
+    set:
+      server.publicUrl: https://mail.example.org
+      webmail.enabled: true
+      webmail.publicUrl: https://webmail.example.org
+      webmail.image.tag: 27.1-rc.7
+      networkPolicy.webmailInternet: false
+    documentSelector: {path: metadata.name, value: mail-inbuxa-webmail}
+    asserts:
+      - lengthEqual:
+          path: spec.egress
+          count: 2
+
+  - it: can be turned off
+    set:
+      networkPolicy.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
