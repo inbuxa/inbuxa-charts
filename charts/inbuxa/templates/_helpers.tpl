@@ -177,3 +177,8 @@ chart.
 {{- end }}
 {{- join "," $dirs }}
 {{- end }}
+
+{{/* The Secret with the metrics scrape username and password. */}}
+{{- define "inbuxa.server.metricsSecret" -}}
+{{- default (printf "%s-metrics" (include "inbuxa.fullname" .)) .Values.server.metrics.prometheus.existingSecret -}}
+{{- end -}}
