@@ -76,6 +76,20 @@ server:
     timeoutSeconds: 1800
     resources: {}
 
+  # Before each server pod starts, an init container checks the data layer
+  # (`inbuxa --check`): it opens the data store, writes, reads and deletes a
+  # small object in the blob store, and connects to NATS. A pod that can't
+  # use one stays in Init:Error, and its status names the part and why
+  # (kubectl describe pod). Needs server 27.1-rc.33 or later.
+  check:
+    enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+
   # Where browsers and clients reach the server, as https://host. Sign-in
   # pages and OAuth metadata name it.
   publicUrl: ""
