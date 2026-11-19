@@ -210,6 +210,33 @@ spec:
           annotations:
             summary: {{`"{{ $labels.pod }} keeps going in and out of ready"`}}
             description: A pod is ready while its data store answers; flapping readiness usually means the store is struggling.
+        {{- if $root.Values.server.backup.enabled }}
+        - alert: InbuxaBackupMissing
+          expr: >-
+            time() - max(kube_cronjob_status_last_successful_time{namespace="{{ .Release.Namespace }}",cronjob="{{ $full }}-backup"}
+            or kube_cronjob_created{namespace="{{ .Release.Namespace }}",cronjob="{{ $full }}-backup"})
+            > {{ printf "%.0f" (mulf $r.backupHours 3600) }}
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: No export of the store has finished for {{ $r.backupHours }} hours
+            description: >-
+              The backup CronJob's runs have failed, or not started. Its last
+              Job's log says why (kubectl logs job/...).
+        {{- end }}
+        {{- if or $root.Values.server.storeCheck.quick.enabled $root.Values.server.storeCheck.full.enabled }}
+        - alert: InbuxaStoreCheckFailed
+          expr: kube_job_status_failed{namespace="{{ .Release.Namespace }}",job_name=~"{{ $full }}-store-check-.*"} > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: {{`"Store check {{ $labels.job_name }} found problems, or couldn't finish"`}}
+            description: >-
+              Its log has the summary; the console's Store checks page lists
+              the problems. Delete the Job once it has been looked at: the
+              alert lasts while the failed Job does.
+        {{- end }}
         {{- end }}
 {{- end }}
 {{- end }}

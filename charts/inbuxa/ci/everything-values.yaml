@@ -59,6 +59,15 @@ server:
     mail:
       loadBalancerClass: example.org/lb
       annotations: {example.org/lb-pool: mail}
+  backup:
+    enabled: true
+    url: s3://mail-backups/inbuxa
+    endpoint: http://minio.storage.svc:9000
+    existingSecret: inbuxa-backup-keys
+    timeZone: America/Phoenix
+  storeCheck:
+    quick: {enabled: true}
+    full: {enabled: true}
   metrics:
     prometheus:
       enabled: true

@@ -272,6 +272,55 @@ server:
           pop3s: 10995
           sieve: 14190
 
+  # A nightly export of the whole store to an S3 bucket (`inbuxa --export
+  # s3://...`), streamed, while the server runs. Each goes in a new folder
+  # named for the time, with export.json written last: an export without it
+  # didn't finish. Nothing here deletes old exports: give the bucket a
+  # lifecycle rule. Restore into a new, empty store with
+  # `inbuxa --import s3://bucket/prefix` (the newest finished export) before
+  # any server pod starts. Needs server 27.1-rc.34.
+  backup:
+    enabled: false
+    # Cron, in timeZone (the controller's, UTC on most clusters, when empty)
+    schedule: "30 2 * * *"
+    timeZone: ""
+    # s3://bucket/prefix
+    url: ""
+    # An S3-compatible service (MinIO, Garage, Ceph), addressed path-style;
+    # empty for AWS
+    endpoint: ""
+    region: us-east-1
+    # A Secret with the keys under access-key and secret-key. Empty: the
+    # AWS defaults (the pod's role, through serviceAccountName)
+    existingSecret: ""
+    serviceAccountName: ""
+    # A run longer than this is stopped (and fails)
+    timeoutSeconds: 21600
+    # Tries per night: a failed try leaves an unfinished folder behind
+    backoffLimit: 1
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    resources: {}
+
+  # Store checks on a schedule (`inbuxa --store-check`): quick finds blobs
+  # the store names but doesn't have; full also reads every blob and checks
+  # its hash, paced to 20 MiB/s. Each is saved with the console's other store
+  # checks, and a check that finds problems fails its Job (exit 3), so
+  # kube-state-metrics, and the alerts, see it. Needs server 27.1-rc.34.
+  storeCheck:
+    quick:
+      enabled: false
+      schedule: "15 3 * * *"
+      timeoutSeconds: 21600
+    full:
+      enabled: false
+      schedule: "15 4 * * 0"
+      timeoutSeconds: 172800
+    timeZone: ""
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    resources: {}
+
   # Metrics, for Prometheus or an OpenTelemetry collector. Needs server
   # 27.1-rc.34; an older server ignores these settings.
   metrics:
@@ -312,6 +361,9 @@ server:
         certificateDays: 14
         # 99th-percentile data store read or write, in milliseconds
         storeLatencyMs: 1000
+        # With backup on and kubeStateMetrics: hours since the last export
+        # that finished
+        backupHours: 36
     # Push metrics to an OpenTelemetry collector over OTLP. Only when the
     # store has no OpenTelemetry metrics set: the console's setting wins.
     # Every pod pushes its own, named by service.instance.id and
