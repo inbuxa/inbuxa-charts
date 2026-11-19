@@ -222,7 +222,7 @@ def ports_page(docs):
 
 def alerts_page(docs):
     lines = front(
-        "Alerts",
+        "Prometheus alerts",
         "The alert rules the **inbuxa** chart ships for Prometheus, and what each one means.",
     )
     lines += [
