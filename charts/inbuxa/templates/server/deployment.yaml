@@ -223,6 +223,34 @@ spec:
             - name: INBUXA_ADMIN_URL
               value: {{ trimSuffix "/" $root.Values.console.publicUrl | quote }}
             {{- end }}
+            {{- with $server.metrics }}
+            {{- if .prometheus.enabled }}
+            # /metrics/prometheus, behind this username and password (K-C10)
+            - name: INBUXA_METRICS_PROMETHEUS_USERNAME
+              value: {{ .prometheus.username | quote }}
+            - name: INBUXA_METRICS_PROMETHEUS_SECRET_FILE
+              value: /etc/inbuxa/metrics/password
+            {{- end }}
+            {{- if .otlp.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .otlp.endpoint | quote }}
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: {{ .otlp.protocol | quote }}
+            - name: OTEL_METRIC_EXPORT_INTERVAL
+              value: {{ mul (int .otlp.intervalSeconds) 1000 | quote }}
+            - name: OTEL_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: {{ printf "service.instance.id=$(OTEL_POD_NAME),k8s.pod.name=$(OTEL_POD_NAME),k8s.namespace.name=%s,k8s.deployment.name=%s-%s,inbuxa.group=%s" $root.Release.Namespace (include "inbuxa.fullname" $root) $group $group | quote }}
+            {{- if .otlp.headersSecret }}
+            # A file, not the environment: the headers carry the token
+            - name: INBUXA_OTLP_HEADERS_FILE
+              value: /etc/inbuxa/otlp/headers
+            {{- end }}
+            {{- end }}
+            {{- end }}
             {{- with $g.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -293,6 +321,16 @@ spec:
               mountPath: /etc/inbuxa/tls/{{ $name }}
               readOnly: true
             {{- end }}
+            {{- if $server.metrics.prometheus.enabled }}
+            - name: metrics
+              mountPath: /etc/inbuxa/metrics
+              readOnly: true
+            {{- end }}
+            {{- if and $server.metrics.otlp.enabled $server.metrics.otlp.headersSecret }}
+            - name: otlp
+              mountPath: /etc/inbuxa/otlp
+              readOnly: true
+            {{- end }}
             - name: data
               mountPath: /var/lib/inbuxa
             - name: tmp
@@ -333,6 +371,24 @@ spec:
             items:
               - {key: tls.crt, path: tls.crt}
               - {key: tls.key, path: tls.key}
+        {{- end }}
+        {{- if $server.metrics.prometheus.enabled }}
+        - name: metrics
+          secret:
+            secretName: {{ include "inbuxa.server.metricsSecret" $root }}
+            defaultMode: 0440
+            items:
+              - key: password
+                path: password
+        {{- end }}
+        {{- if and $server.metrics.otlp.enabled $server.metrics.otlp.headersSecret }}
+        - name: otlp
+          secret:
+            secretName: {{ $server.metrics.otlp.headersSecret }}
+            defaultMode: 0440
+            items:
+              - key: headers
+                path: headers
         {{- end }}
         # Scratch only: everything lasting is in the data store
         - name: data

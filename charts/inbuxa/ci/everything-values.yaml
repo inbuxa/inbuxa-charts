@@ -59,6 +59,17 @@ server:
     mail:
       loadBalancerClass: example.org/lb
       annotations: {example.org/lb-pool: mail}
+  metrics:
+    prometheus:
+      enabled: true
+      serviceMonitor: {enabled: true, interval: 15s, labels: {release: kube-prometheus}}
+      rules: {enabled: true, labels: {release: kube-prometheus}, certificateDays: 21}
+    otlp:
+      enabled: true
+      endpoint: http://otel-collector.monitoring:4317
+      protocol: grpc
+      headersSecret: otel-headers
+    grafanaDashboard: {enabled: true}
   seed:
     enabled: true
     request:
@@ -103,6 +114,9 @@ networkPolicy:
   httpFrom:
     - namespaceSelector:
         matchLabels: {kubernetes.io/metadata.name: gateway}
+  metricsFrom:
+    - namespaceSelector:
+        matchLabels: {kubernetes.io/metadata.name: monitoring}
   serverEgress:
     - to:
         - namespaceSelector:

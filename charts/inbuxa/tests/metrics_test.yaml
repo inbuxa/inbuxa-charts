@@ -1,0 +1,243 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+suite: metrics
+templates:
+  - server/metrics.yaml
+  - server/deployment.yaml
+  - networkpolicy.yaml
+release:
+  name: mail
+  namespace: inbuxa
+values:
+  - ../ci/defaults-values.yaml
+tests:
+  - it: makes nothing by default
+    template: server/metrics.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: leaves the pods' metrics settings to the store by default
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_METRICS_PROMETHEUS_SECRET_FILE, value: /etc/inbuxa/metrics/password}
+      - notContains:
+          path: spec.template.spec.volumes
+          content: {name: metrics}
+          any: true
+
+  - it: makes a password and a headless Service over every server pod
+    template: server/metrics.yaml
+    set:
+      server.metrics.prometheus.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: data.username
+          value: cHJvbWV0aGV1cw==
+        documentSelector: {path: kind, value: Secret}
+      - matchRegex:
+          path: data.password
+          pattern: ^[A-Za-z0-9+/=]{40,}$
+        documentSelector: {path: kind, value: Secret}
+      - equal:
+          path: spec.clusterIP
+          value: None
+        documentSelector: {path: kind, value: Service}
+      - notExists:
+          path: spec.selector["inbuxa.org/group"]
+        documentSelector: {path: kind, value: Service}
+
+  - it: uses an existing Secret instead of making one
+    template: server/metrics.yaml
+    set:
+      server.metrics.prometheus.enabled: true
+      server.metrics.prometheus.existingSecret: scrape
+      server.metrics.prometheus.serviceMonitor.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.endpoints[0].basicAuth.password
+          value: {name: scrape, key: password}
+        documentSelector: {path: kind, value: ServiceMonitor}
+
+  - it: gives every pod the username and the password as a file
+    template: server/deployment.yaml
+    set:
+      server.metrics.prometheus.enabled: true
+      server.metrics.prometheus.username: scraper
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_METRICS_PROMETHEUS_USERNAME, value: scraper}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_METRICS_PROMETHEUS_SECRET_FILE, value: /etc/inbuxa/metrics/password}
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content: {name: metrics, mountPath: /etc/inbuxa/metrics, readOnly: true}
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: metrics
+            secret:
+              secretName: mail-inbuxa-metrics
+              defaultMode: 0440
+              items: [{key: password, path: password}]
+
+  - it: scrapes each pod with basic auth and labels its group
+    template: server/metrics.yaml
+    set:
+      server.metrics.prometheus.enabled: true
+      server.metrics.prometheus.serviceMonitor.enabled: true
+      server.metrics.prometheus.serviceMonitor.labels: {release: prom}
+    documentSelector: {path: kind, value: ServiceMonitor}
+    asserts:
+      - equal:
+          path: metadata.labels.release
+          value: prom
+      - equal:
+          path: spec.podTargetLabels
+          value: [inbuxa.org/group]
+      - equal:
+          path: spec.endpoints[0].path
+          value: /metrics/prometheus
+      - equal:
+          path: spec.endpoints[0].basicAuth.username
+          value: {name: mail-inbuxa-metrics, key: username}
+      - equal:
+          path: spec.selector.matchLabels["inbuxa.org/metrics"]
+          value: "true"
+
+  - it: needs scraping on for a ServiceMonitor
+    template: server/metrics.yaml
+    set:
+      server.metrics.prometheus.serviceMonitor.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: turn on enabled
+
+  - it: needs the ServiceMonitor for the rules
+    template: server/metrics.yaml
+    set:
+      server.metrics.prometheus.enabled: true
+      server.metrics.prometheus.rules.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: they need serviceMonitor on
+
+  - it: alerts on this release's pods, with the thresholds given
+    template: server/metrics.yaml
+    set:
+      server.metrics.prometheus.enabled: true
+      server.metrics.prometheus.serviceMonitor.enabled: true
+      server.metrics.prometheus.rules.enabled: true
+      server.metrics.prometheus.rules.queueOldestHours: 12
+      server.metrics.prometheus.rules.certificateDays: 7
+    documentSelector: {path: kind, value: PrometheusRule}
+    asserts:
+      - lengthEqual:
+          path: spec.groups[0].rules
+          count: 9
+      - equal:
+          path: spec.groups[0].rules[0].expr
+          value: up{job="mail-inbuxa-metrics",namespace="inbuxa"} == 0
+      - equal:
+          path: spec.groups[0].rules[1].expr
+          value: time() - (cluster_lease_renewed{job="mail-inbuxa-metrics",namespace="inbuxa"} > 0) > 300
+      - equal:
+          path: spec.groups[0].rules[3].expr
+          value: time() - max(queue_oldest_message{job="mail-inbuxa-metrics",namespace="inbuxa",inbuxa_org_group="core"} > 0) > 43200
+      - equal:
+          path: spec.groups[0].rules[5].expr
+          value: min(tls_earliest_expiry{job="mail-inbuxa-metrics",namespace="inbuxa"} > 0) - time() < 604800
+      - equal:
+          path: spec.groups[0].rules[0].annotations.summary
+          value: "{{ $labels.pod }} doesn't answer the metrics scrape"
+      - matchRegex:
+          path: spec.groups[0].rules[7].expr
+          pattern: pod=~"mail-inbuxa-\(front\|mta\|core\)-\.\*",container="server"
+
+  - it: leaves out the kube-state-metrics alerts when asked
+    template: server/metrics.yaml
+    set:
+      server.metrics.prometheus.enabled: true
+      server.metrics.prometheus.serviceMonitor.enabled: true
+      server.metrics.prometheus.rules.enabled: true
+      server.metrics.prometheus.rules.kubeStateMetrics: false
+    documentSelector: {path: kind, value: PrometheusRule}
+    asserts:
+      - lengthEqual:
+          path: spec.groups[0].rules
+          count: 7
+
+  - it: pushes OTLP from every pod, the headers from a file
+    template: server/deployment.yaml
+    documentIndex: 2
+    set:
+      server.metrics.otlp.enabled: true
+      server.metrics.otlp.endpoint: http://otel.monitoring:4317
+      server.metrics.otlp.protocol: grpc
+      server.metrics.otlp.intervalSeconds: 30
+      server.metrics.otlp.headersSecret: otel
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: http://otel.monitoring:4317}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: OTEL_EXPORTER_OTLP_PROTOCOL, value: grpc}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: OTEL_METRIC_EXPORT_INTERVAL, value: "30000"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_RESOURCE_ATTRIBUTES
+            value: service.instance.id=$(OTEL_POD_NAME),k8s.pod.name=$(OTEL_POD_NAME),k8s.namespace.name=inbuxa,k8s.deployment.name=mail-inbuxa-core,inbuxa.group=core
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_OTLP_HEADERS_FILE, value: /etc/inbuxa/otlp/headers}
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: otlp
+            secret: {secretName: otel, defaultMode: 0440, items: [{key: headers, path: headers}]}
+
+  - it: needs a collector for OTLP
+    template: server/metrics.yaml
+    set:
+      server.metrics.otlp.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: name the collector
+
+  - it: ships the dashboard for Grafana's sidecar
+    template: server/metrics.yaml
+    set:
+      server.metrics.grafanaDashboard.enabled: true
+    asserts:
+      - equal:
+          path: metadata.labels.grafana_dashboard
+          value: "1"
+      - matchRegex:
+          path: data["inbuxa.json"]
+          pattern: '"uid": "inbuxa-server"'
+
+  - it: lets Prometheus through to the http port when that is narrowed
+    template: networkpolicy.yaml
+    set:
+      networkPolicy.httpFrom:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ingress}}
+      networkPolicy.metricsFrom:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+    documentSelector: {path: metadata.name, value: mail-inbuxa-server}
+    asserts:
+      - contains:
+          path: spec.ingress[1].from
+          content: {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}}

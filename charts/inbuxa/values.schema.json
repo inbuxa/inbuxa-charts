@@ -557,6 +557,133 @@
               }
             }
           }
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "prometheus": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "username": {
+                  "type": "string",
+                  "pattern": "^[^:\\s]+$"
+                },
+                "existingSecret": {
+                  "type": "string"
+                },
+                "serviceMonitor": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "interval": {
+                      "type": "string",
+                      "pattern": "^[0-9]+(ms|s|m|h)$"
+                    },
+                    "labels": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "rules": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "labels": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "kubeStateMetrics": {
+                      "type": "boolean"
+                    },
+                    "queueMessages": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "queueOldestHours": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "deliveryFailureRatio": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 1
+                    },
+                    "certificateDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "storeLatencyMs": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    }
+                  }
+                }
+              }
+            },
+            "otlp": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "endpoint": {
+                  "type": "string",
+                  "pattern": "^$|^https?://"
+                },
+                "protocol": {
+                  "enum": [
+                    "http/protobuf",
+                    "grpc"
+                  ]
+                },
+                "intervalSeconds": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "headersSecret": {
+                  "type": "string"
+                }
+              }
+            },
+            "grafanaDashboard": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "labels": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -782,6 +909,12 @@
         },
         "webmailInternet": {
           "type": "boolean"
+        },
+        "metricsFrom": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
         }
       }
     },

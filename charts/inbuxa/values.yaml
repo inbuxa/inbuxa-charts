@@ -272,6 +272,67 @@ server:
           pop3s: 10995
           sieve: 14190
 
+  # Metrics, for Prometheus or an OpenTelemetry collector. Needs server
+  # 27.1-rc.33; an older server ignores these settings.
+  metrics:
+    prometheus:
+      # Every server pod serves /metrics/prometheus on its http port, behind
+      # basic auth. A headless Service, <release>-metrics, lists them all.
+      enabled: false
+      username: prometheus
+      # A Secret with the keys username (the same as above) and password.
+      # Empty: the chart makes one, with a random password kept across
+      # upgrades. The pods read the password as a file.
+      existingSecret: ""
+      # A ServiceMonitor for the Prometheus Operator, scraping each pod
+      serviceMonitor:
+        enabled: false
+        interval: 30s
+        labels: {}
+      # PrometheusRules: alerts for a pod down, a cluster lease not renewed,
+      # a large or stuck queue, failing deliveries, a certificate about to
+      # expire and a slow data store. They read the pods' group from the
+      # label the ServiceMonitor adds, so they need it on.
+      rules:
+        enabled: false
+        labels: {}
+        # Alerts on restarts and readiness from kube-state-metrics, when the
+        # cluster has it
+        kubeStateMetrics: true
+        # Messages in the queue
+        queueMessages: 5000
+        # Hours the oldest message may wait. A queue keeps retrying a
+        # message for days, so one that waits longer is worth a look.
+        queueOldestHours: 24
+        # Share of deliveries that bounce, over half an hour
+        deliveryFailureRatio: 0.25
+        # Days before the first certificate in use expires
+        certificateDays: 14
+        # 99th-percentile data store read or write, in milliseconds
+        storeLatencyMs: 1000
+    # Push metrics to an OpenTelemetry collector over OTLP. Only when the
+    # store has no OpenTelemetry metrics set: the console's setting wins.
+    # The role each group runs needs the metricsPush task for its pods to
+    # push.
+    otlp:
+      enabled: false
+      # The collector, e.g. http://otel-collector.monitoring:4318
+      endpoint: ""
+      # http/protobuf or grpc
+      protocol: http/protobuf
+      intervalSeconds: 60
+      # A Secret whose key headers holds headers to send, key=value pairs by
+      # commas or lines, for a collector that wants a token. The pods read it
+      # as a file.
+      headersSecret: ""
+    # A Grafana dashboard as a ConfigMap, for Grafana's dashboard sidecar
+    grafanaDashboard:
+      enabled: false
+      # The label the sidecar looks for
+      labels:
+        grafana_dashboard: "1"
+      annotations: {}
+
 # The webmail, signing people in through the server's own page (OAuth). Off
 # by default: it needs its own address, and the server's publicUrl.
 webmail:
@@ -365,6 +426,11 @@ networkPolicy:
   #       matchLabels: {kubernetes.io/metadata.name: ingress-nginx}
   # Empty: from anywhere. The webmail always reaches the server.
   httpFrom: []
+  # Prometheus, when httpFrom is set: it scrapes the server pods' http
+  # port. As NetworkPolicy peers, e.g.
+  #   - namespaceSelector:
+  #       matchLabels: {kubernetes.io/metadata.name: monitoring}
+  metricsFrom: []
   # Where the server and its Jobs may connect, as NetworkPolicy egress rules,
   # besides DNS. Empty: anywhere, which a mail server needs to deliver mail
   # unless it hands everything to a relay. Narrow it to your data store,

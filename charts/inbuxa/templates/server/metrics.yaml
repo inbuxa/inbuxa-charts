@@ -1,0 +1,236 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+Metrics: the scrape password, a headless Service listing every server pod,
+a ServiceMonitor, PrometheusRules and a Grafana dashboard.
+
+Each pod counts its own traffic, so Prometheus scrapes every pod, not a
+Service that picks one. The queue gauges are read from the core pod, which
+always counts the queue itself: another pod's queue count is only what it
+queued and delivered since the last count.
+*/}}
+{{- $root := . }}
+{{- $full := include "inbuxa.fullname" . }}
+{{- $m := .Values.server.metrics }}
+{{- $prom := $m.prometheus }}
+{{- if and (or $prom.serviceMonitor.enabled $prom.rules.enabled) (not $prom.enabled) }}
+{{- fail "server.metrics.prometheus: turn on enabled for the ServiceMonitor or the rules" }}
+{{- end }}
+{{- if and $prom.rules.enabled (not $prom.serviceMonitor.enabled) }}
+{{- fail "server.metrics.prometheus.rules: they need serviceMonitor on, which labels each pod's series with its group" }}
+{{- end }}
+{{- if and $m.otlp.enabled (not $m.otlp.endpoint) }}
+{{- fail "server.metrics.otlp.endpoint: name the collector, e.g. http://otel-collector.monitoring:4318" }}
+{{- end }}
+{{- if $prom.enabled }}
+{{- $secret := include "inbuxa.server.metricsSecret" . }}
+{{- if not $prom.existingSecret }}
+{{- /* Random once, then kept, so Prometheus and the pods agree across upgrades */}}
+{{- $existing := (lookup "v1" "Secret" .Release.Namespace $secret).data | default dict }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secret }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+type: Opaque
+data:
+  username: {{ $prom.username | b64enc }}
+  password: {{ index $existing "password" | default (randAlphaNum 40 | b64enc) }}
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $full }}-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+    inbuxa.org/metrics: "true"
+spec:
+  # Headless: every pod is its own target
+  clusterIP: None
+  selector:
+    {{- include "inbuxa.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+{{- if $prom.serviceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $full }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+    {{- with $prom.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "inbuxa.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+      inbuxa.org/metrics: "true"
+  namespaceSelector:
+    matchNames: [{{ .Release.Namespace }}]
+  # inbuxa_org_group on every series: front, mta or core
+  podTargetLabels: [inbuxa.org/group]
+  endpoints:
+    - port: http
+      path: /metrics/prometheus
+      interval: {{ $prom.serviceMonitor.interval }}
+      basicAuth:
+        username:
+          name: {{ $secret }}
+          key: username
+        password:
+          name: {{ $secret }}
+          key: password
+{{- end }}
+{{- if $prom.rules.enabled }}
+{{- $r := $prom.rules }}
+{{- $sel := printf "job=\"%s-metrics\",namespace=\"%s\"" $full .Release.Namespace }}
+{{- $core := printf "%s,inbuxa_org_group=\"core\"" $sel }}
+{{- $pods := printf "namespace=\"%s\",pod=~\"%s-(front|mta|core)-.*\"" .Release.Namespace $full }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $full }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+    {{- with $r.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: inbuxa.server
+      rules:
+        - alert: InbuxaServerDown
+          expr: up{ {{- $sel -}} } == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: {{`"{{ $labels.pod }} doesn't answer the metrics scrape"`}}
+            description: Prometheus has failed to scrape this server pod for five minutes.
+        - alert: InbuxaClusterLeaseNotRenewed
+          expr: time() - (cluster_lease_renewed{ {{- $sel -}} } > 0) > 300
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: {{`"{{ $labels.pod }} has stopped renewing its cluster lease"`}}
+            description: >-
+              The pod runs, but hasn't written its heartbeat to the data store
+              for over five minutes, so the rest of the cluster sees it as
+              gone. Its logs say why; usually the data store.
+        - alert: InbuxaQueueLarge
+          expr: max(queue_count{ {{- $core -}} }) > {{ int $r.queueMessages }}
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: {{`"{{ $value }} messages are waiting in the queue"`}}
+            description: >-
+              More than {{ int $r.queueMessages }} messages for half an hour.
+              Delivery may be failing or slow; the console's queue says to
+              where.
+        - alert: InbuxaQueueMessageWaiting
+          expr: time() - max(queue_oldest_message{ {{- $core -}} } > 0) > {{ printf "%.0f" (mulf $r.queueOldestHours 3600) }}
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: A message has been in the queue for over {{ $r.queueOldestHours }} hours
+            description: >-
+              The oldest queued message arrived {{`{{ $value | humanizeDuration }}`}}
+              ago. The console's queue shows its recipients and the last
+              error.
+        - alert: InbuxaDeliveriesFailing
+          expr: >-
+            sum(rate(delivery_dsn_perm_fail{ {{- $sel -}} }[30m]))
+            / (sum(rate(delivery_dsn_perm_fail{ {{- $sel -}} }[30m])) + (sum(rate(delivery_delivered{ {{- $sel -}} }[30m])) or vector(0)))
+            > {{ $r.deliveryFailureRatio }}
+            and sum(increase(delivery_dsn_perm_fail{ {{- $sel -}} }[30m])) > 10
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: {{`"{{ $value | humanizePercentage }} of deliveries are bouncing"`}}
+            description: >-
+              Over half an hour, more than {{ printf "%g" (mulf $r.deliveryFailureRatio 100) }}% of
+              outbound deliveries ended in a bounce. Check whether the mta
+              pods' address is listed, or a relay refuses them.
+        - alert: InbuxaCertificateExpiring
+          expr: min(tls_earliest_expiry{ {{- $sel -}} } > 0) - time() < {{ printf "%.0f" (mulf $r.certificateDays 86400) }}
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: {{`"A certificate the server uses expires in {{ $value | humanizeDuration }}"`}}
+            description: >-
+              Renewal should have replaced it by now. For ACME, the server's
+              logs and the console's certificates page say why it hasn't; for
+              a mounted Secret, cert-manager's Certificate status.
+        - alert: InbuxaDataStoreSlow
+          expr: >-
+            histogram_quantile(0.99, sum by (le) (rate(store_data_read_time_bucket{ {{- $sel -}} }[10m]))) > {{ $r.storeLatencyMs }}
+            or histogram_quantile(0.99, sum by (le) (rate(store_data_write_time_bucket{ {{- $sel -}} }[10m]))) > {{ $r.storeLatencyMs }}
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: {{`"Data store reads or writes take {{ $value }} ms at the 99th percentile"`}}
+            description: Everything waits on the data store. Check its load and the network to it.
+        {{- if $r.kubeStateMetrics }}
+        - alert: InbuxaServerRestarting
+          expr: increase(kube_pod_container_status_restarts_total{ {{- $pods -}} ,container="server"}[30m]) > 2
+          labels:
+            severity: warning
+          annotations:
+            summary: {{`"{{ $labels.pod }} restarted {{ $value }} times in half an hour"`}}
+            description: The container's last log lines are its termination message (kubectl describe pod).
+        - alert: InbuxaServerReadinessFlapping
+          expr: changes(kube_pod_status_ready{ {{- $pods -}} ,condition="true"}[30m]) > 4
+          labels:
+            severity: warning
+          annotations:
+            summary: {{`"{{ $labels.pod }} keeps going in and out of ready"`}}
+            description: A pod is ready while its data store answers; flapping readiness usually means the store is struggling.
+        {{- end }}
+{{- end }}
+{{- end }}
+{{- if $m.grafanaDashboard.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $full }}-dashboard
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+    {{- with $m.grafanaDashboard.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $m.grafanaDashboard.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  inbuxa.json: |-
+    {{- .Files.Get "files/grafana-dashboard.json" | nindent 4 }}
+{{- end }}

@@ -9,6 +9,7 @@ all, in and out; the policies after it open only what each one needs:
   server          its mail listeners and https from   anywhere (networkPolicy.serverEgress
                   anywhere; http from the webmail      narrows it)
                   and from networkPolicy.httpFrom
+                  and .metricsFrom
   seed, upgrade,  nothing                             as the server
   egress-check
   webmail         8080 from networkPolicy.httpFrom    DNS; the server's http port; TCP 80
@@ -74,6 +75,9 @@ spec:
       {{- if $np.httpFrom }}
       from:
         {{- toYaml $np.httpFrom | nindent 8 }}
+        {{- with $np.metricsFrom }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- if $root.Values.webmail.enabled }}
         - podSelector:
             matchLabels:

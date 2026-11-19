@@ -78,6 +78,17 @@ runs, pinned by digest.
   status names the part and why. The server container keeps its last log
   lines as its termination message too. Needs server 27.1-rc.33: an older
   server doesn't know `--check`.
+- Metrics (`server.metrics`, off by default). `prometheus`: every server
+  pod serves `/metrics/prometheus` behind a username and a password the pods
+  read as a file, and a headless Service lists them all, with a
+  ServiceMonitor that scrapes each pod and labels its group. `rules`:
+  PrometheusRules for a pod down, a cluster lease not renewed, a large or
+  stuck queue, deliveries bouncing, a certificate about to expire, a slow
+  data store, and (from kube-state-metrics) restarts and flapping readiness.
+  `otlp`: push to an OpenTelemetry collector, the token from a Secret read as
+  a file. `grafanaDashboard`: a dashboard for Grafana's sidecar.
+  `networkPolicy.metricsFrom` lets Prometheus through when `httpFrom` is
+  narrowed. Needs server 27.1-rc.33.
 - `networkPolicy`, on by default: every pod starts from deny all, in and
   out, and gets only what it needs. The server takes mail on its listeners
   from anywhere and connects anywhere; `networkPolicy.httpFrom` and
