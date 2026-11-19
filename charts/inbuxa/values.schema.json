@@ -246,6 +246,38 @@
             }
           }
         },
+        "certificates": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "acmeHosts": {
+              "type": "array",
+              "items": {"type": "string", "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"}
+            },
+            "secrets": {
+              "type": "array",
+              "items": {"type": "string", "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"}
+            },
+            "certManager": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "issuerRef": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {"type": "string"},
+                    "kind": {"type": "string", "enum": ["Issuer", "ClusterIssuer"]},
+                    "group": {"type": "string"}
+                  }
+                },
+                "dnsNames": {"type": "array", "items": {"type": "string"}},
+                "renewBefore": {"type": "string"}
+              }
+            }
+          }
+        },
         "egress": {
           "type": "object",
           "additionalProperties": false,

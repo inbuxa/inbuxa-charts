@@ -269,3 +269,60 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "routes.gateway.parentRefs"
+
+  - it: sends the ACME challenges for the mail host names to the server
+    template: routes.yaml
+    set:
+      routes.gateway.enabled: true
+      routes.gateway.parentRefs: [{name: public, namespace: gateway}]
+      server.certificates.acmeHosts: [mx.example.org, mail.example.org, mx.example.org]
+    asserts:
+      - hasDocuments:
+          count: 4
+      - equal:
+          path: metadata.name
+          value: mail-inbuxa-acme
+        documentIndex: 3
+      - equal:
+          path: spec.hostnames
+          value: [mx.example.org]
+        documentIndex: 3
+      - equal:
+          path: spec.rules[0]
+          value:
+            matches: [{path: {type: PathPrefix, value: /.well-known/acme-challenge/}}]
+            backendRefs: [{name: mail-inbuxa-http, port: 8080}]
+        documentIndex: 3
+
+  - it: and through the Ingress
+    template: routes.yaml
+    set:
+      routes.ingress.enabled: true
+      server.certificates.acmeHosts: [mx.example.org]
+    asserts:
+      - equal:
+          path: spec.rules[3]
+          value:
+            host: mx.example.org
+            http:
+              paths:
+                - path: /.well-known/acme-challenge/
+                  pathType: Prefix
+                  backend: {service: {name: mail-inbuxa-http, port: {name: http}}}
+
+  - it: refuses an ACME host that's a front end's
+    template: routes.yaml
+    set:
+      routes.ingress.enabled: true
+      server.certificates.acmeHosts: [webmail.example.org]
+    asserts:
+      - failedTemplate:
+          errorPattern: "webmail.example.org is the webmail's host"
+
+  - it: refuses ACME hosts with no routes to carry them
+    template: routes.yaml
+    set:
+      server.certificates.acmeHosts: [mx.example.org]
+    asserts:
+      - failedTemplate:
+          errorPattern: "turn on routes.gateway or routes.ingress"

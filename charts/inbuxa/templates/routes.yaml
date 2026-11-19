@@ -5,6 +5,11 @@ SPDX-License-Identifier: Apache-2.0
 Routes from outside, one per public address, by host name: the server's
 publicUrl to its HTTP Service, and the webmail's and the console's to
 theirs. Gateway API HTTPRoutes, or an Ingress where there's no Gateway.
+
+For the server's own ACME with HTTP-01, the names in
+server.certificates.acmeHosts get one more route: their
+/.well-known/acme-challenge/ to the server, which answers the challenge on
+any pod. A name the server's publicUrl already routes needs nothing more.
 */}}
 {{- $root := . }}
 {{- $routes := .Values.routes }}
@@ -25,6 +30,19 @@ theirs. Gateway API HTTPRoutes, or an Ingress where there's no Gateway.
 {{- fail (printf "routes: %s and %s both have the host %s; each needs its own" (index $hosts .host) .name .host) }}
 {{- end }}
 {{- $_ := set $hosts .host .name }}
+{{- end }}
+{{- $acmeHosts := list }}
+{{- range .Values.server.certificates.acmeHosts }}
+{{- if ne (get $hosts .) "server" }}
+{{- if hasKey $hosts . }}
+{{- fail (printf "server.certificates.acmeHosts: %s is the %s's host; the server's ACME challenges can't share it" . (get $hosts .)) }}
+{{- end }}
+{{- $acmeHosts = append $acmeHosts . }}
+{{- end }}
+{{- end }}
+{{- $acmeHosts = uniq $acmeHosts }}
+{{- if and $acmeHosts (not (or $routes.gateway.enabled $routes.ingress.enabled)) }}
+{{- fail "server.certificates.acmeHosts: turn on routes.gateway or routes.ingress to route the challenges, or use DNS-01" }}
 {{- end }}
 {{- if and $routes.gateway.enabled $routes.ingress.enabled }}
 {{- fail "routes: turn on gateway or ingress, not both" }}
@@ -64,6 +82,35 @@ spec:
         - name: {{ .service }}
           port: 8080
 {{- end }}
+{{- if $acmeHosts }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ printf "%s-acme" $full }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: server
+  {{- with $routes.gateway.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  # The Gateway needs an HTTP listener on port 80 for these names
+  parentRefs:
+    {{- toYaml $routes.gateway.parentRefs | nindent 4 }}
+  hostnames:
+    {{- toYaml $acmeHosts | nindent 4 }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /.well-known/acme-challenge/
+      backendRefs:
+        - name: {{ printf "%s-http" $full }}
+          port: 8080
+{{- end }}
 {{- end }}
 {{- if $routes.ingress.enabled }}
 ---
@@ -96,6 +143,18 @@ spec:
             backend:
               service:
                 name: {{ .service }}
+                port:
+                  name: http
+    {{- end }}
+    {{- range $acmeHosts }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - path: /.well-known/acme-challenge/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ printf "%s-http" $full }}
                 port:
                   name: http
     {{- end }}

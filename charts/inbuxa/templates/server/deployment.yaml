@@ -8,6 +8,7 @@ are interchangeable: Deployments, not StatefulSets.
 */}}
 {{- $root := . }}
 {{- $server := .Values.server }}
+{{- $tlsSecrets := splitList " " (include "inbuxa.server.tlsSecrets" $root) | compact }}
 {{- range $group := list "front" "mta" "core" }}
 {{- $g := index $server.groups $group }}
 {{- if $g.enabled }}
@@ -191,6 +192,11 @@ spec:
             # sign-ins and anonymous requests aren't charged to the proxy
             - name: INBUXA_HTTP_USE_FORWARDED
               value: "true"
+            {{- if $tlsSecrets }}
+            # Certificates from TLS Secrets, reread when they're renewed
+            - name: INBUXA_TLS_CERTIFICATE_DIRS
+              value: {{ include "inbuxa.server.tlsDirs" $tlsSecrets | quote }}
+            {{- end }}
             {{- with $server.trustedProxies }}
             - name: INBUXA_HTTP_TRUSTED_PROXIES
               value: {{ join "," . | quote }}
@@ -281,6 +287,12 @@ spec:
               mountPath: /etc/inbuxa/webmail
               readOnly: true
             {{- end }}
+            {{- range $i, $name := $tlsSecrets }}
+            # A whole directory, never a subPath: a renewal reaches the pod
+            - name: tls-{{ $i }}
+              mountPath: /etc/inbuxa/tls/{{ $name }}
+              readOnly: true
+            {{- end }}
             - name: data
               mountPath: /var/lib/inbuxa
             - name: tmp
@@ -312,6 +324,15 @@ spec:
               - key: oauth-client-secret
                 path: oauth-client-secret
         {{- end }}
+        {{- end }}
+        {{- range $i, $name := $tlsSecrets }}
+        - name: tls-{{ $i }}
+          secret:
+            secretName: {{ $name }}
+            defaultMode: 0440
+            items:
+              - {key: tls.crt, path: tls.crt}
+              - {key: tls.key, path: tls.key}
         {{- end }}
         # Scratch only: everything lasting is in the data store
         - name: data
