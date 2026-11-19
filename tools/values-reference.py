@@ -184,20 +184,24 @@ def body(entries, root):
                 out += ["```yaml", *example, "```", ""]
             continue
         default = value if value not in (None, "") else None
-        out.append(f"- **`{path}`**" + (f" ({kind})" if kind else ""))
-        if default is not None:
-            out.append(f"  Default: `{default}`.")
-        elif block:
-            out.append("  Default:")
-            out.append("")
-            out.append("  ```yaml")
+        # One line each for the name, the default, the limits and the
+        # comment: a backslash ends a line without starting a paragraph
+        head = f"- **`{path}`**" + (f" ({kind})" if kind else "")
+        rest = []
+        if limits:
+            rest.append("Allowed: " + "; ".join(limits) + ".")
+        if paragraph:
+            rest.append(paragraph)
+        if default is not None or not block:
+            lines = [head] + ([f"Default: `{default}`."] if default is not None else []) + rest
+            out += ["  " * (i > 0) + t + ("\\" if i < len(lines) - 1 else "") for i, t in enumerate(lines)]
+        else:
+            out += [head + "\\", "  Default:", "", "  ```yaml"]
             indent = min(len(b) - len(b.lstrip()) for b in block if b.strip())
             out += ["  " + b[indent:] for b in block if b.strip()]
             out.append("  ```")
-        if limits:
-            out.append("  Allowed: " + "; ".join(limits) + ".")
-        if paragraph:
-            out.append("  " + paragraph)
+            if rest:
+                out += [""] + ["  " + t + ("\\" if i < len(rest) - 1 else "") for i, t in enumerate(rest)]
         if example:
             out += ["", "  ```yaml", *["  " + e for e in example], "  ```"]
         out.append("")
