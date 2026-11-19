@@ -1,0 +1,3 @@
+# refuses: name the bucket
+server:
+  backup: {enabled: true}

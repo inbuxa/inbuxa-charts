@@ -1,0 +1,4 @@
+# refuses: protocol
+server:
+  metrics:
+    otlp: {enabled: true, endpoint: "http://otel:4318", protocol: http/json}

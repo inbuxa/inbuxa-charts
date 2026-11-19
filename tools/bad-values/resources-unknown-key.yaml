@@ -1,0 +1,4 @@
+# refuses: gpu|additional propert
+server:
+  resources:
+    requests: {gpu: 1}

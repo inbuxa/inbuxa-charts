@@ -40,7 +40,7 @@
           "type": "string"
         },
         "resources": {
-          "type": "object"
+          "$ref": "#/definitions/resources"
         },
         "nodeSelector": {
           "type": "object",
@@ -142,6 +142,103 @@
           }
         }
       }
+    },
+    "resources": {
+      "description": "Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, as quantities (100m, 256Mi).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requests": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cpu": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei|e[0-9]+)?$"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            },
+            "memory": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei|e[0-9]+)?$"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            },
+            "ephemeral-storage": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei|e[0-9]+)?$"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cpu": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei|e[0-9]+)?$"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            },
+            "memory": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei|e[0-9]+)?$"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            },
+            "ephemeral-storage": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei|e[0-9]+)?$"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "stringMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   },
   "properties": {
@@ -242,7 +339,7 @@
               "minimum": 30
             },
             "resources": {
-              "type": "object"
+              "$ref": "#/definitions/resources"
             }
           }
         },
@@ -315,7 +412,7 @@
               "minimum": 60
             },
             "resources": {
-              "type": "object"
+              "$ref": "#/definitions/resources"
             }
           }
         },
@@ -403,7 +500,7 @@
           }
         },
         "resources": {
-          "type": "object"
+          "$ref": "#/definitions/resources"
         },
         "terminationGracePeriodSeconds": {
           "type": "integer",
@@ -742,7 +839,7 @@
               "minimum": 0
             },
             "resources": {
-              "type": "object"
+              "$ref": "#/definitions/resources"
             }
           }
         },
@@ -796,7 +893,7 @@
               "minimum": 0
             },
             "resources": {
-              "type": "object"
+              "$ref": "#/definitions/resources"
             }
           }
         }
@@ -864,7 +961,7 @@
           }
         },
         "resources": {
-          "type": "object"
+          "$ref": "#/definitions/resources"
         },
         "podDisruptionBudget": {
           "type": "object",
@@ -882,7 +979,7 @@
           }
         },
         "nodeSelector": {
-          "type": "object"
+          "$ref": "#/definitions/stringMap"
         },
         "tolerations": {
           "type": "array"
@@ -891,7 +988,7 @@
           "type": "object"
         },
         "podAnnotations": {
-          "type": "object"
+          "$ref": "#/definitions/stringMap"
         },
         "existingSecret": {
           "type": "string"
@@ -972,7 +1069,7 @@
           }
         },
         "resources": {
-          "type": "object"
+          "$ref": "#/definitions/resources"
         },
         "podDisruptionBudget": {
           "type": "object",
@@ -990,7 +1087,7 @@
           }
         },
         "nodeSelector": {
-          "type": "object"
+          "$ref": "#/definitions/stringMap"
         },
         "tolerations": {
           "type": "array"
@@ -999,7 +1096,7 @@
           "type": "object"
         },
         "podAnnotations": {
-          "type": "object"
+          "$ref": "#/definitions/stringMap"
         }
       }
     },
@@ -1048,7 +1145,7 @@
               "type": "array"
             },
             "annotations": {
-              "type": "object"
+              "$ref": "#/definitions/stringMap"
             }
           }
         },
@@ -1063,7 +1160,7 @@
               "type": "string"
             },
             "annotations": {
-              "type": "object"
+              "$ref": "#/definitions/stringMap"
             },
             "tls": {
               "type": "array"

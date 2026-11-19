@@ -1,0 +1,4 @@
+# refuses: replicas.*(minimum|greater than or equal)
+server:
+  groups:
+    front: {replicas: -1}

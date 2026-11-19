@@ -1,0 +1,5 @@
+# refuses: release.*string|string.*release|labels
+server:
+  metrics:
+    prometheus:
+      serviceMonitor: {labels: {release: 1}}
