@@ -116,6 +116,30 @@ Before an upgrade rolls new pods out, a Job on the new image asks the server wha
   Default: `{}`.
   Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, as quantities (100m, 256Mi).
 
+### `server.check`
+
+Before each server pod starts, an init container checks the data layer (`inbuxa --check`): it opens the data store, writes, reads and deletes a small object in the blob store, and connects to NATS. A pod that can't use one stays in Init:Error, and its status names the part and why (kubectl describe pod). Needs server 27.1-rc.33 or later.
+
+- **`server.check.enabled`** (boolean)
+  Default: `true`.
+
+#### `server.check.resources`
+
+Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, as quantities (100m, 256Mi).
+
+#### `server.check.resources.requests`
+
+- **`server.check.resources.requests.cpu`** (string or number)
+  Default: `50m`.
+
+- **`server.check.resources.requests.memory`** (string or number)
+  Default: `64Mi`.
+
+#### `server.check.resources.limits`
+
+- **`server.check.resources.limits.memory`** (string or number)
+  Default: `256Mi`.
+
 - **`server.publicUrl`** (string)
   Default: `""`.
   Allowed: matching `^(https://[^/\s]+)?$`.
@@ -293,6 +317,44 @@ The addresses outbound mail should leave from: the ones with reverse DNS (PTR) r
 - **`server.egress.checkUrl`** (string)
   Default: `""`.
   Allowed: matching `^(https?://\S+)?$`.
+
+### `server.certificates`
+
+Certificates for the mail ports (SMTP STARTTLS, submissions, IMAPS, POP3S, ManageSieve). HTTPS from outside is the Gateway's or the Ingress's (routes below). Two ways: - The server's own ACME (an ACME provider set up in the seed or the
+
+```yaml
+console): certificates are kept in the store, and every pod uses them.
+DNS-01 needs nothing here. For HTTP-01, name the hosts in acmeHosts:
+the routes send their /.well-known/acme-challenge/ to the server.
+- TLS Secrets (kubernetes.io/tls), mounted in every server pod and used
+as they are: existing ones in secrets, or certManager to have the
+chart ask cert-manager for one. The pods reread them within about two
+minutes of a renewal, with no restart. Needs server 27.1-rc.33.
+```
+
+- **`server.certificates.acmeHosts`** (list of string)
+  Default: `[]`.
+
+- **`server.certificates.secrets`** (list of string)
+  Default: `[]`.
+  Names of Secrets in this namespace, each with tls.crt and tls.key
+
+#### `server.certificates.certManager`
+
+- **`server.certificates.certManager.enabled`** (boolean)
+  Default: `false`.
+
+- **`server.certificates.certManager.issuerRef`** (object)
+  Default: `{}`.
+  The Issuer or ClusterIssuer, e.g. {name: letsencrypt, kind: ClusterIssuer}
+
+- **`server.certificates.certManager.dnsNames`** (list of string)
+  Default: `[]`.
+  The mail host names, e.g. [mail.example.org, mx.example.org]
+
+- **`server.certificates.certManager.renewBefore`** (string)
+  Default: `""`.
+  Renew this long before expiry; empty is cert-manager's default
 
 ### `server.resources`
 
