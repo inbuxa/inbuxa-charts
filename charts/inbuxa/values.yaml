@@ -312,8 +312,8 @@ server:
         storeLatencyMs: 1000
     # Push metrics to an OpenTelemetry collector over OTLP. Only when the
     # store has no OpenTelemetry metrics set: the console's setting wins.
-    # The role each group runs needs the metricsPush task for its pods to
-    # push.
+    # Every pod pushes its own, named by service.instance.id and
+    # k8s.pod.name; the collector adds them up.
     otlp:
       enabled: false
       # The collector, e.g. http://otel-collector.monitoring:4318
