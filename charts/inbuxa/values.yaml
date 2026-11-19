@@ -304,8 +304,10 @@ server:
         # Hours the oldest message may wait. A queue keeps retrying a
         # message for days, so one that waits longer is worth a look.
         queueOldestHours: 24
-        # Share of deliveries that bounce, over half an hour
+        # Share of deliveries that bounce, over half an hour, once at least
+        # deliveryFailureMinimum have
         deliveryFailureRatio: 0.25
+        deliveryFailureMinimum: 10
         # Days before the first certificate in use expires
         certificateDays: 14
         # 99th-percentile data store read or write, in milliseconds

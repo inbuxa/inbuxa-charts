@@ -624,6 +624,10 @@
                       "exclusiveMinimum": 0,
                       "maximum": 1
                     },
+                    "deliveryFailureMinimum": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
                     "certificateDays": {
                       "type": "number",
                       "exclusiveMinimum": 0

@@ -164,7 +164,7 @@ spec:
             sum(rate(delivery_dsn_perm_fail{ {{- $sel -}} }[30m]))
             / (sum(rate(delivery_dsn_perm_fail{ {{- $sel -}} }[30m])) + (sum(rate(delivery_delivered{ {{- $sel -}} }[30m])) or vector(0)))
             > {{ $r.deliveryFailureRatio }}
-            and sum(increase(delivery_dsn_perm_fail{ {{- $sel -}} }[30m])) > 10
+            and sum(increase(delivery_dsn_perm_fail{ {{- $sel -}} }[30m])) >= {{ int $r.deliveryFailureMinimum }}
           for: 15m
           labels:
             severity: warning
