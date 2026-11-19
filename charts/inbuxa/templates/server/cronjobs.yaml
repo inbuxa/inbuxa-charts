@@ -1,0 +1,188 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+Scheduled one-shots on the server image, against the store the server pods
+use: a nightly export to S3 (server.backup) and store checks
+(server.storeCheck). Each run is the server binary with one flag, the
+server's config.json and its Secrets; it opens no ports and nothing
+connects to it. Never two of one kind at once (concurrencyPolicy Forbid),
+and the server itself runs one store check at a time: a check that finds
+another running exits 2.
+*/}}
+{{- $root := . }}
+{{- $server := .Values.server }}
+{{- $full := include "inbuxa.fullname" . }}
+{{- $backup := $server.backup }}
+{{- $check := $server.storeCheck }}
+{{- $jobs := list }}
+{{- if $backup.enabled }}
+{{- if not $backup.url }}
+{{- fail "server.backup.url: name the bucket, as s3://bucket/prefix" }}
+{{- end }}
+{{- $jobs = append $jobs (dict "name" "backup" "component" "backup" "schedule" $backup.schedule "timeZone" $backup.timeZone "timeout" $backup.timeoutSeconds "backoff" $backup.backoffLimit "ok" $backup.successfulJobsHistoryLimit "failed" $backup.failedJobsHistoryLimit "resources" $backup.resources "args" (list "--export" $backup.url)) }}
+{{- end }}
+{{- range $mode := list "quick" "full" }}
+{{- $c := index $check $mode }}
+{{- if $c.enabled }}
+{{- /* Never again on its own: exit 3 is an answer (problems found), not a failure to retry */}}
+{{- $jobs = append $jobs (dict "name" (printf "store-check-%s" $mode) "component" "store-check" "schedule" $c.schedule "timeZone" $check.timeZone "timeout" $c.timeoutSeconds "backoff" 0 "ok" $check.successfulJobsHistoryLimit "failed" $check.failedJobsHistoryLimit "resources" $check.resources "args" (list "--store-check" $mode)) }}
+{{- end }}
+{{- end }}
+{{- range $i, $job := $jobs }}
+{{- if $i }}
+---
+{{- end }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $full }}-{{ $job.name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $job.component }}
+  annotations:
+    ignore-check.kube-linter.io/no-liveness-probe: "A one-shot that serves nothing; activeDeadlineSeconds bounds it"
+    ignore-check.kube-linter.io/no-readiness-probe: "A one-shot that serves nothing"
+    ignore-check.kube-linter.io/restart-policy: "Never: a failed run is a new Job, up to backoffLimit; a store check is never rerun"
+    {{- if eq $job.name "backup" }}
+    ignore-check.kube-linter.io/env-var-secret: "INBUXA_EXPORT_S3_SECRET_KEY_FILE holds a path; the key is a mounted file"
+    {{- end }}
+spec:
+  schedule: {{ $job.schedule | quote }}
+  {{- with $job.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  concurrencyPolicy: Forbid
+  # A run missed by more than an hour (the controller was down) waits for
+  # the next one
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: {{ $job.ok }}
+  failedJobsHistoryLimit: {{ $job.failed }}
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "inbuxa.labels" $root | nindent 8 }}
+        app.kubernetes.io/component: {{ $job.component }}
+    spec:
+      backoffLimit: {{ $job.backoff }}
+      activeDeadlineSeconds: {{ $job.timeout }}
+      template:
+        metadata:
+          labels:
+            {{- include "inbuxa.labels" $root | nindent 12 }}
+            app.kubernetes.io/component: {{ $job.component }}
+        spec:
+          {{- if and (eq $job.name "backup") $backup.serviceAccountName }}
+          # The bucket's keys from the pod's role (IRSA, Pod Identity)
+          serviceAccountName: {{ $backup.serviceAccountName }}
+          {{- else }}
+          automountServiceAccountToken: false
+          {{- end }}
+          enableServiceLinks: false
+          restartPolicy: Never
+          {{- with $root.Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $server.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $server.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 2000
+            runAsGroup: 2000
+            fsGroup: 2000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: {{ $job.component }}
+              image: {{ include "inbuxa.server.image" $root }}
+              imagePullPolicy: {{ $server.image.pullPolicy }}
+              args:
+                {{- range $job.args }}
+                - {{ . | quote }}
+                {{- end }}
+                - "--config"
+                - "/etc/inbuxa/config.json"
+              env:
+                - name: INBUXA_HOSTNAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                {{- if eq $job.name "backup" }}
+                {{- with $backup.endpoint }}
+                - name: INBUXA_EXPORT_S3_ENDPOINT
+                  value: {{ . | quote }}
+                {{- end }}
+                - name: INBUXA_EXPORT_S3_REGION
+                  value: {{ $backup.region | quote }}
+                {{- if $backup.existingSecret }}
+                - name: INBUXA_EXPORT_S3_ACCESS_KEY_FILE
+                  value: /etc/inbuxa/backup-s3/access-key
+                - name: INBUXA_EXPORT_S3_SECRET_KEY_FILE
+                  value: /etc/inbuxa/backup-s3/secret-key
+                {{- end }}
+                {{- end }}
+              resources:
+                {{- toYaml (default $server.resources $job.resources) | nindent 16 }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: config
+                  mountPath: /etc/inbuxa/config.json
+                  subPath: config.json
+                  readOnly: true
+                {{- if $server.secretMounts }}
+                - name: secrets
+                  mountPath: /etc/inbuxa/secrets
+                  readOnly: true
+                {{- end }}
+                {{- if and (eq $job.name "backup") $backup.existingSecret }}
+                - name: backup-s3
+                  mountPath: /etc/inbuxa/backup-s3
+                  readOnly: true
+                {{- end }}
+                - name: data
+                  mountPath: /var/lib/inbuxa
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: config
+              configMap:
+                name: {{ $full }}-server
+            {{- if $server.secretMounts }}
+            - name: secrets
+              projected:
+                defaultMode: 0440
+                sources:
+                  {{- range $server.secretMounts }}
+                  - secret:
+                      name: {{ .secretName }}
+                      items:
+                        {{- toYaml .items | nindent 24 }}
+                  {{- end }}
+            {{- end }}
+            {{- if and (eq $job.name "backup") $backup.existingSecret }}
+            - name: backup-s3
+              secret:
+                secretName: {{ $backup.existingSecret }}
+                defaultMode: 0440
+                items:
+                  - {key: access-key, path: access-key}
+                  - {key: secret-key, path: secret-key}
+            {{- end }}
+            # Scratch only: the export streams to the bucket
+            - name: data
+              emptyDir: {}
+            - name: tmp
+              emptyDir: {}
+{{- end }}

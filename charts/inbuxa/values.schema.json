@@ -635,6 +635,10 @@
                     "storeLatencyMs": {
                       "type": "number",
                       "exclusiveMinimum": 0
+                    },
+                    "backupHours": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
                     }
                   }
                 }
@@ -686,6 +690,113 @@
                   }
                 }
               }
+            }
+          }
+        },
+        "backup": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "schedule": {
+              "type": "string",
+              "minLength": 1
+            },
+            "timeZone": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string",
+              "pattern": "^$|^s3://[^/]+(/.*)?$"
+            },
+            "endpoint": {
+              "type": "string",
+              "pattern": "^$|^https?://"
+            },
+            "region": {
+              "type": "string",
+              "minLength": 1
+            },
+            "existingSecret": {
+              "type": "string"
+            },
+            "serviceAccountName": {
+              "type": "string"
+            },
+            "timeoutSeconds": {
+              "type": "integer",
+              "minimum": 60
+            },
+            "backoffLimit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "successfulJobsHistoryLimit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failedJobsHistoryLimit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "resources": {
+              "type": "object"
+            }
+          }
+        },
+        "storeCheck": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "quick": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "schedule": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "timeoutSeconds": {
+                  "type": "integer",
+                  "minimum": 60
+                }
+              }
+            },
+            "full": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "schedule": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "timeoutSeconds": {
+                  "type": "integer",
+                  "minimum": 60
+                }
+              }
+            },
+            "timeZone": {
+              "type": "string"
+            },
+            "successfulJobsHistoryLimit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failedJobsHistoryLimit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "resources": {
+              "type": "object"
             }
           }
         }

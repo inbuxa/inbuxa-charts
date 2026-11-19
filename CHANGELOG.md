@@ -78,6 +78,14 @@ runs, pinned by digest.
   status names the part and why. The server container keeps its last log
   lines as its termination message too. Needs server 27.1-rc.33: an older
   server doesn't know `--check`.
+- Backups and store checks on a schedule. `server.backup` exports the
+  whole store nightly to an S3 bucket (`inbuxa --export s3://...`), streamed
+  while the server runs, into a folder per export with `export.json`
+  written last; `inbuxa --import s3://bucket/prefix` restores the newest
+  finished one. `server.storeCheck` runs a quick check nightly and a full
+  one weekly; a check that finds problems fails its Job. With the metrics
+  rules and kube-state-metrics, InbuxaBackupMissing and
+  InbuxaStoreCheckFailed alert on them. Needs server 27.1-rc.34.
 - Metrics (`server.metrics`, off by default). `prometheus`: every server
   pod serves `/metrics/prometheus` behind a username and a password the pods
   read as a file, and a headless Service lists them all, with a

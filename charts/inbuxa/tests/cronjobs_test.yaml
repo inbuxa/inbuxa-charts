@@ -1,0 +1,142 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+suite: scheduled jobs
+templates:
+  - server/cronjobs.yaml
+  - server/metrics.yaml
+  - networkpolicy.yaml
+release:
+  name: mail
+  namespace: inbuxa
+values:
+  - ../ci/defaults-values.yaml
+tests:
+  - it: schedules nothing by default
+    template: server/cronjobs.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: needs a bucket for the backup
+    template: server/cronjobs.yaml
+    set:
+      server.backup.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: name the bucket
+
+  - it: exports to the bucket nightly, keys from a Secret as files
+    template: server/cronjobs.yaml
+    set:
+      server.backup.enabled: true
+      server.backup.url: s3://mail-backups/inbuxa
+      server.backup.endpoint: http://minio.storage:9000
+      server.backup.existingSecret: backup-keys
+      server.backup.timeZone: America/Phoenix
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: mail-inbuxa-backup
+      - equal:
+          path: spec.schedule
+          value: "30 2 * * *"
+      - equal:
+          path: spec.timeZone
+          value: America/Phoenix
+      - equal:
+          path: spec.concurrencyPolicy
+          value: Forbid
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].args
+          value: [--export, s3://mail-backups/inbuxa, --config, /etc/inbuxa/config.json]
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content: {name: INBUXA_EXPORT_S3_ENDPOINT, value: http://minio.storage:9000}
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content: {name: INBUXA_EXPORT_S3_SECRET_KEY_FILE, value: /etc/inbuxa/backup-s3/secret-key}
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.volumes
+          content:
+            name: backup-s3
+            secret:
+              secretName: backup-keys
+              defaultMode: 0440
+              items: [{key: access-key, path: access-key}, {key: secret-key, path: secret-key}]
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.volumes[0].configMap.name
+          value: mail-inbuxa-server
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.automountServiceAccountToken
+          value: false
+
+  - it: takes the bucket's keys from the pod's role when no Secret is named
+    template: server/cronjobs.yaml
+    set:
+      server.backup.enabled: true
+      server.backup.url: s3://mail-backups
+      server.backup.serviceAccountName: inbuxa-backup
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.serviceAccountName
+          value: inbuxa-backup
+      - notContains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content: {name: INBUXA_EXPORT_S3_ACCESS_KEY_FILE, value: /etc/inbuxa/backup-s3/access-key}
+
+  - it: checks the store quick nightly and full weekly, never retrying a check
+    template: server/cronjobs.yaml
+    set:
+      server.storeCheck.quick.enabled: true
+      server.storeCheck.full.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].args
+          value: [--store-check, quick, --config, /etc/inbuxa/config.json]
+        documentIndex: 0
+      - equal:
+          path: spec.schedule
+          value: "15 4 * * 0"
+        documentIndex: 1
+      - equal:
+          path: spec.jobTemplate.spec.backoffLimit
+          value: 0
+        documentIndex: 1
+      - equal:
+          path: spec.jobTemplate.spec.activeDeadlineSeconds
+          value: 172800
+        documentIndex: 1
+
+  - it: lets the scheduled jobs out as the server, and nothing in
+    template: networkpolicy.yaml
+    documentSelector: {path: metadata.name, value: mail-inbuxa-jobs}
+    asserts:
+      - contains:
+          path: spec.podSelector.matchExpressions
+          content: {key: app.kubernetes.io/component, operator: In, values: [seed, upgrade, egress-check, backup, store-check]}
+
+  - it: alerts when no backup finishes, and when a store check fails
+    template: server/metrics.yaml
+    set:
+      server.backup.enabled: true
+      server.backup.url: s3://mail-backups
+      server.storeCheck.quick.enabled: true
+      server.metrics.prometheus.enabled: true
+      server.metrics.prometheus.serviceMonitor.enabled: true
+      server.metrics.prometheus.rules.enabled: true
+      server.metrics.prometheus.rules.backupHours: 30
+    documentSelector: {path: kind, value: PrometheusRule}
+    asserts:
+      - lengthEqual:
+          path: spec.groups[0].rules
+          count: 11
+      - matchRegex:
+          path: spec.groups[0].rules[9].expr
+          pattern: cronjob="mail-inbuxa-backup"\}\)\s+> 108000$
+      - equal:
+          path: spec.groups[0].rules[10].expr
+          value: kube_job_status_failed{namespace="inbuxa",job_name=~"mail-inbuxa-store-check-.*"} > 0
