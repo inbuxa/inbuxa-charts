@@ -22,14 +22,9 @@ metadata:
     {{- include "inbuxa.labels" $root | nindent 4 }}
     app.kubernetes.io/component: server
     inbuxa.org/group: {{ $group }}
-  {{- with $root.Values.webmail }}
-  {{- if .enabled }}
+  {{- if $root.Values.webmail.enabled }}
   annotations:
-    ignore-check.kube-linter.io/read-secret-from-env-var: "TODO(K-S2): the webmail's OAuth client secret comes from the environment until the server takes *_FILE"
-    {{- if .existingSecret }}
-    ignore-check.kube-linter.io/env-value-from: "webmail.existingSecret is the operator's, made outside the chart"
-    {{- end }}
-  {{- end }}
+    ignore-check.kube-linter.io/env-var-secret: "INBUXA_WEBMAIL_CLIENT_SECRET_FILE holds a path to the mounted secret, not the secret"
   {{- end }}
 spec:
   replicas: {{ $g.replicas }}
@@ -161,11 +156,9 @@ spec:
             {{- if .enabled }}
             - name: INBUXA_WEBMAIL_URL
               value: {{ trimSuffix "/" .publicUrl | quote }}
-            - name: INBUXA_WEBMAIL_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ default (printf "%s-webmail" (include "inbuxa.fullname" $root)) .existingSecret }}
-                  key: oauth-client-secret
+            # A file, not the environment (K-S2)
+            - name: INBUXA_WEBMAIL_CLIENT_SECRET_FILE
+              value: /etc/inbuxa/webmail/oauth-client-secret
             {{- end }}
             {{- end }}
             {{- if $root.Values.console.enabled }}
@@ -223,6 +216,11 @@ spec:
               mountPath: /etc/inbuxa/secrets
               readOnly: true
             {{- end }}
+            {{- if $root.Values.webmail.enabled }}
+            - name: webmail
+              mountPath: /etc/inbuxa/webmail
+              readOnly: true
+            {{- end }}
             - name: data
               mountPath: /var/lib/inbuxa
             - name: tmp
@@ -242,6 +240,18 @@ spec:
                   items:
                     {{- toYaml .items | nindent 20 }}
               {{- end }}
+        {{- end }}
+        {{- with $root.Values.webmail }}
+        {{- if .enabled }}
+        # The webmail's OAuth client secret, which the server registers it with
+        - name: webmail
+          secret:
+            secretName: {{ default (printf "%s-webmail" (include "inbuxa.fullname" $root)) .existingSecret }}
+            defaultMode: 0440
+            items:
+              - key: oauth-client-secret
+                path: oauth-client-secret
+        {{- end }}
         {{- end }}
         # Scratch only: everything lasting is in the data store
         - name: data

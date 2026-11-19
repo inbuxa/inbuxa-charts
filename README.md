@@ -17,8 +17,7 @@ capability dropped, no privilege escalation, a read-only root filesystem,
 the RuntimeDefault seccomp profile. No pod gets a service-account token except
 the upgrade Job, which scales the server down for a layout change through a
 Role that only it holds. Secrets reach the pods as mounted files, never as
-values. One is still an environment variable until the chart moves to server
-27.1-rc.32: the webmail's OAuth client secret, on the server's side.
+values or environment variables.
 
 NetworkPolicies are on by default (`networkPolicy`) and need a CNI that
 enforces them. Every pod starts from deny all, in and out:
