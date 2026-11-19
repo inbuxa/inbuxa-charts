@@ -273,7 +273,7 @@ server:
           sieve: 14190
 
   # Metrics, for Prometheus or an OpenTelemetry collector. Needs server
-  # 27.1-rc.33; an older server ignores these settings.
+  # 27.1-rc.34; an older server ignores these settings.
   metrics:
     prometheus:
       # Every server pod serves /metrics/prometheus on its http port, behind

@@ -88,7 +88,7 @@ runs, pinned by digest.
   `otlp`: push to an OpenTelemetry collector, the token from a Secret read as
   a file. `grafanaDashboard`: a dashboard for Grafana's sidecar.
   `networkPolicy.metricsFrom` lets Prometheus through when `httpFrom` is
-  narrowed. Needs server 27.1-rc.33.
+  narrowed. Needs server 27.1-rc.34.
 - `networkPolicy`, on by default: every pod starts from deny all, in and
   out, and gets only what it needs. The server takes mail on its listeners
   from anywhere and connects anywhere; `networkPolicy.httpFrom` and
