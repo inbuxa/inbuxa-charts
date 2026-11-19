@@ -1,0 +1,41 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+A cert-manager Certificate for the mail host names, when
+server.certificates.certManager is on. cert-manager keeps it in the Secret
+<release>-mail-tls; the server pods mount it and reread it when it's
+renewed. Until it's first issued, the pods wait for the Secret.
+*/}}
+{{- $root := . }}
+{{- $cm := .Values.server.certificates.certManager }}
+{{- if $cm.enabled }}
+{{- if not $cm.issuerRef.name }}
+{{- fail "server.certificates.certManager.issuerRef: name the Issuer or ClusterIssuer" }}
+{{- end }}
+{{- if not $cm.dnsNames }}
+{{- fail "server.certificates.certManager.dnsNames: name the mail host names" }}
+{{- end }}
+{{- $name := printf "%s-mail-tls" (include "inbuxa.fullname" $root) }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  secretName: {{ $name }}
+  dnsNames:
+    {{- toYaml $cm.dnsNames | nindent 4 }}
+  issuerRef:
+    name: {{ $cm.issuerRef.name }}
+    kind: {{ $cm.issuerRef.kind | default "Issuer" }}
+    group: {{ $cm.issuerRef.group | default "cert-manager.io" }}
+  {{- with $cm.renewBefore }}
+  renewBefore: {{ . }}
+  {{- end }}
+  privateKey:
+    rotationPolicy: Always
+{{- end }}

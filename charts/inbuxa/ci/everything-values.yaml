@@ -22,6 +22,13 @@ server:
   trustedProxies: [10.0.0.0/8, 100.64.0.0/10]
   listeners:
     pop3s: 995
+  certificates:
+    acmeHosts: [mx.example.org]
+    secrets: [mail-tls]
+    certManager:
+      enabled: true
+      issuerRef: {name: letsencrypt, kind: ClusterIssuer}
+      dnsNames: [mail.example.org, mx.example.org]
   egress:
     expectedAddresses: [198.51.100.7, "2001:db8::7"]
     checkUrl: https://ip.example.org/

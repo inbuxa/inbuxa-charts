@@ -52,6 +52,12 @@ runs, pinned by digest.
   passwords between all users would ban the ingress for everyone.
   `server.trustedProxies` lists the proxies when the pod network isn't a
   private range. Needs server 27.1-rc.32; older servers ignore it.
+- Certificates for the mail ports (`server.certificates`): TLS Secrets
+  (`secrets`, or `certManager` to have the chart ask cert-manager for one)
+  mounted in every server pod and reread within about two minutes of a
+  renewal, with no restart; and `acmeHosts`, which routes the server's own
+  ACME HTTP-01 challenges for the mail names to it. Needs server
+  27.1-rc.33.
 - Mail out from a known address (`server.egress`): with
   `expectedAddresses` and `checkUrl` set, a Job placed like the mta pods
   asks which address it leaves from after each install and upgrade, and

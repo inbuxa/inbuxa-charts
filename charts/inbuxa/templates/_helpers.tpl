@@ -154,3 +154,26 @@ Call with (dict "url" .Values.webmail.publicUrl "name" "webmail").
     {{- toYaml . | nindent 4 }}
   {{- end }}
 {{- end -}}
+
+{{/*
+The TLS Secrets mounted in the server pods, space-separated: the ones named
+in server.certificates.secrets, and the one cert-manager issues for the
+chart.
+*/}}
+{{- define "inbuxa.server.tlsSecrets" -}}
+{{- $c := .Values.server.certificates }}
+{{- $names := $c.secrets }}
+{{- if $c.certManager.enabled }}
+{{- $names = append $names (printf "%s-mail-tls" (include "inbuxa.fullname" .)) }}
+{{- end }}
+{{- join " " (uniq $names) }}
+{{- end }}
+
+{{/* INBUXA_TLS_CERTIFICATE_DIRS for a list of TLS Secret names */}}
+{{- define "inbuxa.server.tlsDirs" -}}
+{{- $dirs := list }}
+{{- range . }}
+{{- $dirs = append $dirs (printf "/etc/inbuxa/tls/%s" .) }}
+{{- end }}
+{{- join "," $dirs }}
+{{- end }}

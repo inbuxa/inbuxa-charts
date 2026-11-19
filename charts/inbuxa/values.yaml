@@ -181,6 +181,30 @@ server:
     expectedAddresses: []
     checkUrl: ""
 
+  # Certificates for the mail ports (SMTP STARTTLS, submissions, IMAPS,
+  # POP3S, ManageSieve). HTTPS from outside is the Gateway's or the
+  # Ingress's (routes below). Two ways:
+  # - The server's own ACME (an ACME provider set up in the seed or the
+  #   console): certificates are kept in the store, and every pod uses them.
+  #   DNS-01 needs nothing here. For HTTP-01, name the hosts in acmeHosts:
+  #   the routes send their /.well-known/acme-challenge/ to the server.
+  # - TLS Secrets (kubernetes.io/tls), mounted in every server pod and used
+  #   as they are: existing ones in secrets, or certManager to have the
+  #   chart ask cert-manager for one. The pods reread them within about two
+  #   minutes of a renewal, with no restart. Needs server 27.1-rc.33.
+  certificates:
+    acmeHosts: []
+    # Names of Secrets in this namespace, each with tls.crt and tls.key
+    secrets: []
+    certManager:
+      enabled: false
+      # The Issuer or ClusterIssuer, e.g. {name: letsencrypt, kind: ClusterIssuer}
+      issuerRef: {}
+      # The mail host names, e.g. [mail.example.org, mx.example.org]
+      dnsNames: []
+      # Renew this long before expiry; empty is cert-manager's default
+      renewBefore: ""
+
   # Used for every group that sets no resources of its own
   resources:
     requests:

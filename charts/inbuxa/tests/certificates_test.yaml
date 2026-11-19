@@ -1,0 +1,79 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+suite: certificates
+templates:
+  - server/certificate.yaml
+  - server/deployment.yaml
+release:
+  name: mail
+  namespace: inbuxa
+values:
+  - ../ci/defaults-values.yaml
+tests:
+  - it: mounts no certificates unless asked
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_TLS_CERTIFICATE_DIRS}
+          any: true
+
+  - it: asks cert-manager for nothing unless asked
+    template: server/certificate.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: mounts each TLS Secret whole, so renewals reach the pod
+    template: server/deployment.yaml
+    set:
+      server.certificates.secrets: [mail-tls, mx-tls]
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_TLS_CERTIFICATE_DIRS, value: "/etc/inbuxa/tls/mail-tls,/etc/inbuxa/tls/mx-tls"}
+        documentIndex: 1
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content: {name: tls-1, mountPath: /etc/inbuxa/tls/mx-tls, readOnly: true}
+        documentIndex: 2
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tls-0
+            secret:
+              secretName: mail-tls
+              defaultMode: 0440
+              items: [{key: tls.crt, path: tls.crt}, {key: tls.key, path: tls.key}]
+        documentIndex: 0
+
+  - it: asks cert-manager for the mail names, and mounts what it issues
+    set:
+      server.certificates.certManager:
+        enabled: true
+        issuerRef: {name: letsencrypt, kind: ClusterIssuer}
+        dnsNames: [mail.example.org, mx.example.org]
+    asserts:
+      - equal:
+          path: spec
+          value:
+            secretName: mail-inbuxa-mail-tls
+            dnsNames: [mail.example.org, mx.example.org]
+            issuerRef: {name: letsencrypt, kind: ClusterIssuer, group: cert-manager.io}
+            privateKey: {rotationPolicy: Always}
+        template: server/certificate.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_TLS_CERTIFICATE_DIRS, value: /etc/inbuxa/tls/mail-inbuxa-mail-tls}
+        template: server/deployment.yaml
+        documentIndex: 0
+
+  - it: needs an issuer and names
+    template: server/certificate.yaml
+    set:
+      server.certificates.certManager.enabled: true
+      server.certificates.certManager.dnsNames: [mail.example.org]
+    asserts:
+      - failedTemplate:
+          errorPattern: issuerRef
