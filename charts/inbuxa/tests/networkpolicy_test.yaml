@@ -126,3 +126,24 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: opens the PROXY copies of the mail listeners too
+    set:
+      server.services.mail.proxyProtocol.enabled: true
+      server.services.mail.proxyProtocol.trustedNetworks: [10.0.0.10]
+    documentSelector:
+      path: metadata.name
+      value: mail-inbuxa-server
+    asserts:
+      - equal:
+          path: spec.ingress[0].ports
+          value:
+            - {port: 25, protocol: TCP}
+            - {port: 465, protocol: TCP}
+            - {port: 993, protocol: TCP}
+            - {port: 4190, protocol: TCP}
+            - {port: 443, protocol: TCP}
+            - {port: 10025, protocol: TCP}
+            - {port: 10465, protocol: TCP}
+            - {port: 10993, protocol: TCP}
+            - {port: 14190, protocol: TCP}

@@ -471,6 +471,44 @@
                       "$ref": "#/definitions/port"
                     }
                   }
+                },
+                "proxyProtocol": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "trustedNetworks": {
+                      "description": "The load balancer's addresses, as it connects to the pods: addresses or networks of /8 or narrower.",
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "ports": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "smtp": {
+                          "$ref": "#/definitions/listenerPort"
+                        },
+                        "submissions": {
+                          "$ref": "#/definitions/listenerPort"
+                        },
+                        "imaps": {
+                          "$ref": "#/definitions/listenerPort"
+                        },
+                        "pop3s": {
+                          "$ref": "#/definitions/listenerPort"
+                        },
+                        "sieve": {
+                          "$ref": "#/definitions/listenerPort"
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }

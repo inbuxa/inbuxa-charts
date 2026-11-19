@@ -214,6 +214,25 @@ server:
         imaps: 993
         pop3s: 995
         sieve: 4190
+      # PROXY protocol v2 from the load balancer, instead of keeping the
+      # client's address with externalTrafficPolicy Local alone. The pods get
+      # a second listener for each mail port (these ports in the pod) that
+      # takes the client's address from the PROXY header, believed only from
+      # trustedNetworks: the load balancer's own addresses, as it connects to
+      # the pods. Keep externalTrafficPolicy Local: with Cluster, connections
+      # arrive from the nodes, and trusting nodes lets anyone who reaches a
+      # port claim any address. The load balancer listens on the standard
+      # ports (25, 465, ...): the server tells mail from the internet by port
+      # 25, which it reads from the PROXY header. Needs server 27.1-rc.32.
+      proxyProtocol:
+        enabled: false
+        trustedNetworks: []
+        ports:
+          smtp: 10025
+          submissions: 10465
+          imaps: 10993
+          pop3s: 10995
+          sieve: 14190
 
 # The webmail, signing people in through the server's own page (OAuth). Off
 # by default: it needs its own address, and the server's publicUrl.

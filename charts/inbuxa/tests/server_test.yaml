@@ -256,3 +256,56 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content: {name: INBUXA_HTTP_TRUSTED_PROXIES, value: "100.64.0.0/10,10.0.0.0/8"}
+
+  - it: sends mail to PROXY copies of the listeners, believed from the load balancer only
+    set:
+      server.services.mail.proxyProtocol.enabled: true
+      server.services.mail.proxyProtocol.trustedNetworks: [10.0.0.10, 10.0.0.11]
+    asserts:
+      - equal:
+          path: spec.ports
+          value:
+            - {name: smtp, port: 25, targetPort: p-smtp, protocol: TCP}
+            - {name: submissions, port: 465, targetPort: p-submissions, protocol: TCP}
+            - {name: imaps, port: 993, targetPort: p-imaps, protocol: TCP}
+            - {name: sieve, port: 4190, targetPort: p-sieve, protocol: TCP}
+        template: server/service-mail.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_MAIL_PROXY_LISTENERS, value: "smtp=10025,submissions=10465,imaps=10993,sieve=14190"}
+        template: server/deployment.yaml
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_MAIL_PROXY_TRUSTED_NETWORKS, value: "10.0.0.10,10.0.0.11"}
+        template: server/deployment.yaml
+        documentIndex: 1
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content: {name: p-submissions, containerPort: 10465, protocol: TCP}
+        template: server/deployment.yaml
+        documentIndex: 0
+      # core takes no mail from outside
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: INBUXA_MAIL_PROXY_LISTENERS, value: "smtp=10025,submissions=10465,imaps=10993,sieve=14190"}
+        template: server/deployment.yaml
+        documentIndex: 2
+
+  - it: refuses PROXY protocol without the load balancer's addresses
+    set:
+      server.services.mail.proxyProtocol.enabled: true
+    template: server/service-mail.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: trustedNetworks is required
+
+  - it: refuses PROXY protocol behind the Cluster traffic policy
+    set:
+      server.services.mail.proxyProtocol.enabled: true
+      server.services.mail.proxyProtocol.trustedNetworks: [10.0.0.10]
+      server.services.mail.externalTrafficPolicy: Cluster
+    template: server/service-mail.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: needs externalTrafficPolicy Local
