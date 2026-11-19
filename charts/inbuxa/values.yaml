@@ -201,11 +201,14 @@ webmail:
   publicUrl: ""
   replicas: 2
   # A Secret with app-secret (seals sessions; the same on every replica) and
-  # oauth-client-secret (the server holds it too), and optionally
-  # app-secret-previous (comma-separated secrets that still open sessions
-  # after a rotation). Empty: the chart makes one with random values and
-  # keeps them across upgrades.
+  # oauth-client-secret (the server holds it too). Empty: the chart makes one
+  # with random values and keeps them across upgrades. The webmail reads both
+  # as files, never from its environment.
   existingSecret: ""
+  # While rotating app-secret: true, with the old value(s), comma-separated,
+  # under app-secret-previous in existingSecret. Sessions sealed with them
+  # still open. Set it back to false once they have expired.
+  previousAppSecret: false
   # Addresses whose X-Forwarded-For the webmail believes, as CIDRs. Empty:
   # the private ranges, which covers an ingress inside the cluster.
   trustedProxies: []

@@ -16,6 +16,9 @@ the server inside the cluster, through the HTTP Service.
 {{- end }}
 {{- $name := printf "%s-webmail" (include "inbuxa.fullname" $root) }}
 {{- $secretName := default $name $wm.existingSecret }}
+{{- if and $wm.previousAppSecret (not $wm.existingSecret) }}
+{{- fail "webmail.previousAppSecret needs webmail.existingSecret: the chart's own Secret keeps only the two keys it makes" }}
+{{- end }}
 {{- if not $wm.existingSecret }}
 {{- /* Random once, then kept: a new APP_SECRET would sign everybody out */}}
 {{- $existing := (lookup "v1" "Secret" $root.Release.Namespace $name).data | default dict }}
@@ -42,10 +45,7 @@ metadata:
     {{- include "inbuxa.labels" $root | nindent 4 }}
     app.kubernetes.io/component: webmail
   annotations:
-    ignore-check.kube-linter.io/read-secret-from-env-var: "TODO(K-W4): the webmail reads its secrets from the environment until it takes *_FILE"
-    {{- if $wm.existingSecret }}
-    ignore-check.kube-linter.io/env-value-from: "existingSecret is the operator's, made outside the chart"
-    {{- end }}
+    ignore-check.kube-linter.io/env-var-secret: "the *_SECRET_FILE variables hold paths to the mounted Secret, not secrets"
 spec:
   {{- if not $wm.autoscaling.enabled }}
   replicas: {{ $wm.replicas }}
@@ -82,6 +82,8 @@ spec:
         # node, in the image
         runAsUser: 1000
         runAsGroup: 1000
+        # Owns the mounted secret files (mode 0440)
+        fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
       terminationGracePeriodSeconds: 30
@@ -133,22 +135,18 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: APP_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $secretName }}
-                  key: app-secret
-            - name: APP_SECRET_PREVIOUS
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $secretName }}
-                  key: app-secret-previous
-                  optional: true
-            - name: OAUTH_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $secretName }}
-                  key: oauth-client-secret
+            # Checked at start: a read-only root, nothing kept on disk
+            - name: IMMUTABLE
+              value: "1"
+            # Secrets as files, never in the environment
+            - name: APP_SECRET_FILE
+              value: /etc/inbuxa-webmail/app-secret
+            {{- if $wm.previousAppSecret }}
+            - name: APP_SECRET_PREVIOUS_FILE
+              value: /etc/inbuxa-webmail/app-secret-previous
+            {{- end }}
+            - name: OAUTH_CLIENT_SECRET_FILE
+              value: /etc/inbuxa-webmail/oauth-client-secret
             {{- with $wm.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -179,10 +177,17 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: secrets
+              mountPath: /etc/inbuxa-webmail
+              readOnly: true
       volumes:
         - name: tmp
           emptyDir:
             sizeLimit: 64Mi
+        - name: secrets
+          secret:
+            secretName: {{ $secretName }}
+            defaultMode: 0440
 ---
 apiVersion: v1
 kind: Service
