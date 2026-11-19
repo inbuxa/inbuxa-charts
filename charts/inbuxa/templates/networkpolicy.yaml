@@ -58,6 +58,9 @@ spec:
     {{- $port := int (index $server.listeners $name) }}
     {{- if $port }}{{ $public = append $public $port }}{{ end }}
     {{- end }}
+    {{- range $item := splitList "," (include "inbuxa.server.proxyListeners" $root) }}
+    {{- if $item }}{{ $public = append $public (int (index (splitList "=" $item) 1)) }}{{ end }}
+    {{- end }}
     {{- if $public }}
     # Mail and the server's own TLS listener: clients come from anywhere
     - ports:

@@ -12,6 +12,10 @@ are interchangeable: Deployments, not StatefulSets.
 {{- $g := index $server.groups $group }}
 {{- if $g.enabled }}
 {{- $labels := include "inbuxa.server.selectorLabels" (dict "root" $root "group" $group) }}
+{{- $proxyListeners := "" }}
+{{- if has $group $server.services.mail.groups }}
+{{- $proxyListeners = include "inbuxa.server.proxyListeners" $root }}
+{{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -151,6 +155,14 @@ spec:
             - name: INBUXA_HTTP_TRUSTED_PROXIES
               value: {{ join "," . | quote }}
             {{- end }}
+            {{- if $proxyListeners }}
+            # PROXY protocol copies of the mail listeners, believed from
+            # the load balancer only
+            - name: INBUXA_MAIL_PROXY_LISTENERS
+              value: {{ $proxyListeners | quote }}
+            - name: INBUXA_MAIL_PROXY_TRUSTED_NETWORKS
+              value: {{ join "," $server.services.mail.proxyProtocol.trustedNetworks | quote }}
+            {{- end }}
             {{- /* The front ends, registered as OAuth clients on every start */}}
             {{- with $root.Values.webmail }}
             {{- if .enabled }}
@@ -174,6 +186,14 @@ spec:
             {{- if $port }}
             - name: {{ $name }}
               containerPort: {{ $port }}
+              protocol: TCP
+            {{- end }}
+            {{- end }}
+            {{- range $item := splitList "," $proxyListeners }}
+            {{- if $item }}
+            {{- $kv := splitList "=" $item }}
+            - name: p-{{ index $kv 0 }}
+              containerPort: {{ index $kv 1 }}
               protocol: TCP
             {{- end }}
             {{- end }}

@@ -73,6 +73,27 @@ inbuxa.org/group: {{ .group }}
 {{- end -}}
 
 {{/*
+K-C6: the mail listeners that get a PROXY copy, as INBUXA_MAIL_PROXY_LISTENERS
+takes them ("smtp=10025,imaps=10993"): those the pods listen on and the mail
+Service sends to. Empty when PROXY protocol is off.
+*/}}
+{{- define "inbuxa.server.proxyListeners" -}}
+{{- $mail := .Values.server.services.mail -}}
+{{- $items := list -}}
+{{- if and $mail.enabled $mail.proxyProtocol.enabled -}}
+{{- range $name := list "smtp" "submissions" "imaps" "pop3s" "sieve" -}}
+{{- $target := int (index $.Values.server.listeners $name) -}}
+{{- $port := int (index $mail.ports $name) -}}
+{{- $proxy := int (index $mail.proxyProtocol.ports $name) -}}
+{{- if and $target $port $proxy -}}
+{{- $items = append $items (printf "%s=%d" $name $proxy) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- join "," $items -}}
+{{- end -}}
+
+{{/*
 A front end's image, by digest when one is set. Its tag has no default: the
 webmail and the console are versioned apart from the server. Call with
 (dict "image" .Values.webmail.image "name" "webmail").

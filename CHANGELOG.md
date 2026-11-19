@@ -59,6 +59,12 @@ runs, pinned by digest.
   isn't one of the expected addresses. It never fails an install. Its token
   may create events and nothing else. `podLabels` on each server group, for
   an egress gateway that selects the mta pods.
+- Mail in through a load balancer that sends PROXY protocol v2
+  (`server.services.mail.proxyProtocol`, off by default): the mail Service
+  sends each port to a second listener in the pods that takes the client's
+  address from the PROXY header, believed only from `trustedNetworks`, the
+  load balancer's own addresses. It needs `externalTrafficPolicy: Local`, and
+  server 27.1-rc.32.
 - `networkPolicy`, on by default: every pod starts from deny all, in and
   out, and gets only what it needs. The server takes mail on its listeners
   from anywhere and connects anywhere; `networkPolicy.httpFrom` and
