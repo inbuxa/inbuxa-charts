@@ -87,3 +87,12 @@ routes:
     enabled: true
     parentRefs: [{name: public, namespace: gateway, sectionName: https}]
     annotations: {example.org/route: public}
+networkPolicy:
+  httpFrom:
+    - namespaceSelector:
+        matchLabels: {kubernetes.io/metadata.name: gateway}
+  serverEgress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: data}
+  webmailInternet: false

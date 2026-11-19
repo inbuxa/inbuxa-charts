@@ -645,6 +645,30 @@
         }
       }
     },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "httpFrom": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "serverEgress": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "webmailInternet": {
+          "type": "boolean"
+        }
+      }
+    },
     "routes": {
       "type": "object",
       "additionalProperties": false,

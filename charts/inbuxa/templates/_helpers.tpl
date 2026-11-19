@@ -105,3 +105,31 @@ Call with (dict "url" .Values.webmail.publicUrl "name" "webmail").
 {{- fail (printf "%s.publicUrl: %q should be https://host, with no path" .name .url) -}}
 {{- end -}}
 {{- end -}}
+
+{{/* The server's egress rules (and the Jobs'): anywhere, or DNS plus networkPolicy.serverEgress. */}}
+{{- define "inbuxa.networkPolicy.serverEgress" -}}
+{{- if .Values.networkPolicy.serverEgress -}}
+{{ include "inbuxa.networkPolicy.dns" . }}
+{{ toYaml .Values.networkPolicy.serverEgress }}
+{{- else -}}
+# A mail server delivers to, and looks up, anywhere on the internet
+- {}
+{{- end -}}
+{{- end -}}
+
+{{/* DNS, to whichever resolver the cluster uses. */}}
+{{- define "inbuxa.networkPolicy.dns" -}}
+- ports:
+    - {port: 53, protocol: UDP}
+    - {port: 53, protocol: TCP}
+{{- end -}}
+
+{{/* The webmail's and the console's 8080: from networkPolicy.httpFrom, or anywhere. */}}
+{{- define "inbuxa.networkPolicy.frontEndIngress" -}}
+- ports:
+    - {port: 8080, protocol: TCP}
+  {{- with .Values.networkPolicy.httpFrom }}
+  from:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end -}}

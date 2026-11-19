@@ -1,0 +1,156 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+SPDX-License-Identifier: Apache-2.0
+
+NetworkPolicies, on by default. Every pod the chart makes starts from deny
+all, in and out; the policies after it open only what each one needs:
+
+  pods            in                                  out
+  server          its mail listeners and https from   anywhere (networkPolicy.serverEgress
+                  anywhere; http from the webmail      narrows it)
+                  and from networkPolicy.httpFrom
+  seed, upgrade   nothing                             as the server
+  webmail         8080 from networkPolicy.httpFrom    DNS; the server's http port; TCP 80
+                                                      and 443 anywhere, for remote images
+                                                      and calendars (networkPolicy.webmailInternet)
+  console         8080 from networkPolicy.httpFrom    nothing (the browser calls the server)
+
+httpFrom empty means from anywhere: the ingress controller or gateway that
+routes to these ports is in a namespace the chart can't know. The kubelet's
+probes come from the node, which NetworkPolicy always allows.
+*/}}
+{{- $root := . }}
+{{- $np := .Values.networkPolicy }}
+{{- if $np.enabled }}
+{{- $server := .Values.server }}
+{{- $http := int $server.listeners.http }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "inbuxa.fullname" $root }}-deny-all
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "inbuxa.selectorLabels" $root | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "inbuxa.fullname" $root }}-server
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "inbuxa.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: server
+  policyTypes: [Ingress, Egress]
+  ingress:
+    {{- $public := list }}
+    {{- range $name := list "smtp" "submissions" "imaps" "pop3s" "sieve" "https" }}
+    {{- $port := int (index $server.listeners $name) }}
+    {{- if $port }}{{ $public = append $public $port }}{{ end }}
+    {{- end }}
+    {{- if $public }}
+    # Mail and the server's own TLS listener: clients come from anywhere
+    - ports:
+        {{- range $public }}
+        - {port: {{ . }}, protocol: TCP}
+        {{- end }}
+    {{- end }}
+    {{- if $http }}
+    - ports:
+        - {port: {{ $http }}, protocol: TCP}
+      {{- if $np.httpFrom }}
+      from:
+        {{- toYaml $np.httpFrom | nindent 8 }}
+        {{- if $root.Values.webmail.enabled }}
+        - podSelector:
+            matchLabels:
+              {{- include "inbuxa.selectorLabels" $root | nindent 14 }}
+              app.kubernetes.io/component: webmail
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  egress:
+    {{- include "inbuxa.networkPolicy.serverEgress" $root | nindent 4 }}
+---
+# The seed and upgrade Jobs reach the data store as the server does; the
+# upgrade Job reaches the Kubernetes API too. Nothing connects to them.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "inbuxa.fullname" $root }}-jobs
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "inbuxa.selectorLabels" $root | nindent 6 }}
+    matchExpressions:
+      - {key: app.kubernetes.io/component, operator: In, values: [seed, upgrade]}
+  policyTypes: [Ingress, Egress]
+  egress:
+    {{- include "inbuxa.networkPolicy.serverEgress" $root | nindent 4 }}
+{{- if .Values.webmail.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "inbuxa.fullname" $root }}-webmail
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: webmail
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "inbuxa.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: webmail
+  policyTypes: [Ingress, Egress]
+  ingress:
+    {{- include "inbuxa.networkPolicy.frontEndIngress" $root | nindent 4 }}
+  egress:
+    {{- include "inbuxa.networkPolicy.dns" $root | nindent 4 }}
+    - ports:
+        - {port: {{ $http }}, protocol: TCP}
+      to:
+        - podSelector:
+            matchLabels:
+              {{- include "inbuxa.selectorLabels" $root | nindent 14 }}
+              app.kubernetes.io/component: server
+    {{- if $np.webmailInternet }}
+    # Remote images (IMAGE_PROXY) and subscribed calendars
+    - ports:
+        - {port: 80, protocol: TCP}
+        - {port: 443, protocol: TCP}
+    {{- end }}
+{{- end }}
+{{- if .Values.console.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "inbuxa.fullname" $root }}-console
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: console
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "inbuxa.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: console
+  # No egress rule: nginx serves files and never connects out
+  policyTypes: [Ingress, Egress]
+  ingress:
+    {{- include "inbuxa.networkPolicy.frontEndIngress" $root | nindent 4 }}
+{{- end }}
+{{- end }}
