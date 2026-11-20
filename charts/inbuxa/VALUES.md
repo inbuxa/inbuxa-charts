@@ -385,6 +385,11 @@ Used for every group that sets no resources of its own
   Allowed: at least 0.\
   Time for SMTP sessions in progress to finish when a pod stops
 
+- **`server.shutdownDelaySeconds`** (integer)\
+  Default: `5`.\
+  Allowed: at least 0; at most 60.\
+  Seconds a stopping pod keeps serving before the server is told to stop, while Kubernetes takes it out of the Services. Without it, a request routed in that moment finds the port closed. 0 turns it off; it counts toward terminationGracePeriodSeconds.
+
 ### `server.topologySpread`
 
 Pods of a group are spread across nodes (never two on one node while another node has room) and, where the cluster has zones, across zones.

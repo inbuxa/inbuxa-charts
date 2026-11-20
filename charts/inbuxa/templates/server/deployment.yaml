@@ -285,6 +285,16 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 6
+          {{- if gt (int $server.shutdownDelaySeconds) 0 }}
+          {{- if ge (int $server.shutdownDelaySeconds) (int $server.terminationGracePeriodSeconds) }}
+          {{- fail "server.shutdownDelaySeconds must be less than server.terminationGracePeriodSeconds" }}
+          {{- end }}
+          lifecycle:
+            # Keeps serving while the pod leaves the Services' endpoints
+            preStop:
+              sleep:
+                seconds: {{ int $server.shutdownDelaySeconds }}
+          {{- end }}
           readinessProbe:
             # Ready while the data store answers
             httpGet:

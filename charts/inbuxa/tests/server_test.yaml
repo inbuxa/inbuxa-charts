@@ -339,3 +339,29 @@ tests:
       - notExists:
           path: spec.template.spec.initContainers
 
+
+  - it: keeps serving for a moment while a stopping pod leaves the Services
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.preStop.sleep.seconds
+          value: 5
+
+  - it: leaves the delay out at 0
+    set:
+      server.shutdownDelaySeconds: 0
+    template: server/deployment.yaml
+    documentIndex: 0
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].lifecycle
+
+  - it: refuses a delay as long as the grace period
+    set:
+      server.shutdownDelaySeconds: 30
+      server.terminationGracePeriodSeconds: 30
+    template: server/deployment.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: shutdownDelaySeconds must be less than
