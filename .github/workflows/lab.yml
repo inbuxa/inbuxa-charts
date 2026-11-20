@@ -43,10 +43,10 @@ jobs:
   lab:
     if: ${{ vars.BUILD_ON == 'github' }}
     # Our own repository's workflow, at its main
-    uses: inbuxa/inbuxa-k8s-lab/.github/workflows/e2e.yml@feat/kl8-matrix
+    uses: inbuxa/inbuxa-k8s-lab/.github/workflows/e2e.yml@main
     with:
       chart_ref: ${{ github.sha }}
-      lab_ref: feat/kl8-matrix
+      lab_ref: main
       architectures: '["ubuntu-24.04"]'
 
   report:
