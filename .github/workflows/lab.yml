@@ -1,0 +1,73 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# The lab on every chart branch (K-L8): each push to a branch other than
+# main (a pull request's, on Gitea, reaches here by the push mirror) runs
+# inbuxa-k8s-lab's end-to-end workflow against that commit, on the three
+# Kubernetes minors, amd64. main is covered by the lab's nightly run, on
+# both architectures.
+#
+# The result goes back to the commit on Gitea as the status "lab / e2e", so
+# the pull request shows it: pending when the run starts, then success or
+# failure. Only those two small jobs hold GITEA_TOKEN; the lab runs
+# without it.
+name: lab
+
+on:
+  push:
+    branches-ignore: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lab-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pending:
+    if: ${{ vars.BUILD_ON == 'github' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Status on Gitea
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_URL: ${{ vars.GITEA_URL }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          jq -n --arg u "$RUN" '{state: "pending", context: "lab / e2e", target_url: $u, description: "the lab on GitHub: Kubernetes 1.35-1.37, amd64"}' |
+            curl -fsS --retry 3 -o /dev/null -X POST -H "Authorization: token $GITEA_TOKEN" -H 'Content-Type: application/json' \
+              --data @- "$GITEA_URL/api/v1/repos/inbuxa/inbuxa-charts/statuses/$GITHUB_SHA"
+
+  lab:
+    if: ${{ vars.BUILD_ON == 'github' }}
+    # Our own repository's workflow, at its main
+    uses: inbuxa/inbuxa-k8s-lab/.github/workflows/e2e.yml@main
+    with:
+      chart_ref: ${{ github.sha }}
+      lab_ref: main
+      architectures: '["ubuntu-24.04"]'
+
+  report:
+    needs: lab
+    if: ${{ always() && vars.BUILD_ON == 'github' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Status on Gitea
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_URL: ${{ vars.GITEA_URL }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RESULT: ${{ needs.lab.result }}
+        run: |
+          case "$RESULT" in
+            success) state=success; what="passed" ;;
+            cancelled) state=error; what="cancelled (a newer push?)" ;;
+            *) state=failure; what="failed" ;;
+          esac
+          jq -n --arg s "$state" --arg u "$RUN" --arg d "the lab on GitHub $what" \
+            '{state: $s, context: "lab / e2e", target_url: $u, description: $d}' |
+            curl -fsS --retry 3 -o /dev/null -X POST -H "Authorization: token $GITEA_TOKEN" -H 'Content-Type: application/json' \
+              --data @- "$GITEA_URL/api/v1/repos/inbuxa/inbuxa-charts/statuses/$GITHUB_SHA"
+          echo "lab / e2e: $state"
