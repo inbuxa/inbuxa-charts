@@ -91,6 +91,6 @@ is at [docs.inbuxa.org](https://docs.inbuxa.org/).
 ## License
 
 The chart is free software under the [Apache License 2.0](LICENSE), and a
-Coffey Labs project. The images it runs are licensed separately: the server
-the webmail and the console under the AGPL-3.0, as their own repositories
-say.
+Coffey Labs project. The images it runs are licensed separately: the server,
+the webmail and the console are under the AGPL-3.0, as their own
+repositories say.
