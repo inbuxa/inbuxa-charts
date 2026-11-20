@@ -132,3 +132,6 @@ runs, pinned by digest.
   policies, then the upgrade check (nothing to do on a new store), then the
   seed, which Argo runs on every sync and which does nothing on a seeded
   store.
+- `server.shutdownDelaySeconds` (5 by default): a stopping server pod keeps
+  serving that long, with a `preStop` sleep, while Kubernetes takes it out
+  of the Services, so a request routed to it in that moment isn't refused.
