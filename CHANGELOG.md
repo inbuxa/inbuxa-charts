@@ -123,3 +123,12 @@ runs, pinned by digest.
   signatures check out; the chart pushed to GHCR and the Gitea registry and
   signed keyless with cosign; rendered manifests; a minisign-signed
   `SHA256SUMS`. `tools/verify-release.sh` checks all of it.
+- GitOps (K-C14): `generateSecrets: false` makes the chart refuse to render
+  without `webmail.existingSecret` and
+  `server.metrics.prometheus.existingSecret`, for Argo CD and
+  `helm template | kubectl apply`, which can't read back the secrets the
+  chart makes and would replace them on every sync. Every hook also carries
+  Argo CD's own annotations, so the order there is safe: the hook network
+  policies, then the upgrade check (nothing to do on a new store), then the
+  seed, which Argo runs on every sync and which does nothing on a seeded
+  store.

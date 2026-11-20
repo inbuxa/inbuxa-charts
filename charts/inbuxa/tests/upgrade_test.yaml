@@ -88,3 +88,17 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: runs first under Argo CD, PreSync, before the seed (K-C14)
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PreSync
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-25"
+        documentIndex: 0
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-20"
+        documentIndex: 4

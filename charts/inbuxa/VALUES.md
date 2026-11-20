@@ -21,6 +21,10 @@ outside these limits, before anything is applied.
 - **`imagePullSecrets`** (list of object)\
   Default: `[]`.
 
+- **`generateSecrets`** (boolean)\
+  Default: `true`.\
+  The chart makes two secrets itself when you don't name your own: the webmail's (webmail.existingSecret) and the metrics password (server.metrics.prometheus.existingSecret). It makes each once and then reads it back from the cluster, which only Helm itself can do. Argo CD, and `helm template | kubectl apply`, render without the cluster, so they'd get new ones on every sync: the app never shows Synced, and every webmail user is signed out. Set this to false there, and the chart refuses to render until both are named.
+
 ## `server`
 
 ### `server.image`

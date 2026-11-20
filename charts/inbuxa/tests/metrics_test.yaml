@@ -241,3 +241,21 @@ tests:
       - contains:
           path: spec.ingress[1].from
           content: {namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}}
+
+  - it: refuses to make the metrics Secret when generateSecrets is off (K-C14)
+    template: server/metrics.yaml
+    set:
+      generateSecrets: false
+      server.metrics.prometheus.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "server.metrics.prometheus.existingSecret: generateSecrets is off"
+
+  - it: renders with generateSecrets off once the metrics Secret is named
+    template: server/metrics.yaml
+    set:
+      generateSecrets: false
+      server.metrics.prometheus.enabled: true
+      server.metrics.prometheus.existingSecret: my-metrics
+    asserts:
+      - notFailedTemplate: {}

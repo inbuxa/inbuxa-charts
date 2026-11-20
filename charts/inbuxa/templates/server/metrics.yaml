@@ -25,6 +25,9 @@ queued and delivered since the last count.
 {{- end }}
 {{- if $prom.enabled }}
 {{- $secret := include "inbuxa.server.metricsSecret" . }}
+{{- if and (not $prom.existingSecret) (not .Values.generateSecrets) }}
+{{- fail "server.metrics.prometheus.existingSecret: generateSecrets is off, so name a Secret with username and password" }}
+{{- end }}
 {{- if not $prom.existingSecret }}
 {{- /* Random once, then kept, so Prometheus and the pods agree across upgrades */}}
 {{- $existing := (lookup "v1" "Secret" .Release.Namespace $secret).data | default dict }}

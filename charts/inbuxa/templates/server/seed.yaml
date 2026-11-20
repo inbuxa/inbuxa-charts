@@ -33,6 +33,11 @@ metadata:
   annotations:
     helm.sh/hook: pre-install
     helm.sh/hook-weight: "-5"
+    # Under Argo CD: every sync, after the upgrade (see upgrade.yaml); a
+    # seeded store makes it a no-op
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-15"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 data:
   config.json: {{ toJson $server.dataStore | quote }}
@@ -51,6 +56,11 @@ metadata:
   annotations:
     helm.sh/hook: pre-install
     helm.sh/hook-weight: "0"
+    # Under Argo CD: every sync, after the upgrade (see upgrade.yaml); a
+    # seeded store makes it a no-op
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-10"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
     # A failed run stays, for its log, until the next install or a day
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
     ignore-check.kube-linter.io/no-liveness-probe: "A one-shot that serves nothing; activeDeadlineSeconds bounds it"

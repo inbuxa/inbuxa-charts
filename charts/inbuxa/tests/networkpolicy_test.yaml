@@ -160,6 +160,10 @@ tests:
             helm.sh/hook: pre-install,pre-upgrade,pre-rollback
             helm.sh/hook-weight: "-20"
             helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+            # K-C14: first under Argo CD too, before the upgrade (-25)
+            argocd.argoproj.io/hook: PreSync
+            argocd.argoproj.io/sync-wave: "-30"
+            argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
       - equal:
           path: spec.podSelector.matchLabels
           value: {app.kubernetes.io/name: inbuxa, app.kubernetes.io/instance: mail}
