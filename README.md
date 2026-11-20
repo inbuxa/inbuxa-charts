@@ -1,10 +1,38 @@
-# inbuxa-charts
+<p align="center">
+  <img src="./img/brand/inbuxa-lockup-light.svg" alt="inbuxa" height="140">
+</p>
 
-The Helm chart for running inbuxa on Kubernetes: the mail server, the
-webmail and the console, against a PostgreSQL, NATS and S3 you provide.
+<h3 align="center">
+  inbuxa on Kubernetes: the Helm chart
+</h3>
 
-**Status: in development.** The chart is being built for inbuxa 27.1 and
-doesn't install anything yet. Release candidates start with `27.1.0-rc.1`.
+<p align="center">
+  <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-2dd4bf?style=flat-square"></a>
+  <a href="https://git.coffeylabs.org/inbuxa/inbuxa-charts/releases"><img alt="Latest release" src="https://img.shields.io/gitea/v/release/inbuxa/inbuxa-charts?gitea_url=https%3A%2F%2Fgit.coffeylabs.org&include_prereleases&label=release&color=2dd4bf&style=flat-square"></a>
+  <a href="https://community.coffeylabs.org/c/inbuxa/5"><img alt="Forum: community.coffeylabs.org" src="https://img.shields.io/badge/forum-community.coffeylabs.org-0f766e?style=flat-square"></a>
+  <a href="https://discord.gg/nqcY4TKfAn"><img alt="Chat on Discord" src="https://img.shields.io/discord/1523538164084637797?label=discord&logo=discord&logoColor=white&color=5865f2&style=flat-square"></a>
+</p>
+
+---
+
+> [!NOTE]
+> Development happens on [git.coffeylabs.org/inbuxa/inbuxa-charts](https://git.coffeylabs.org/inbuxa/inbuxa-charts); the copy on GitHub is a read-only mirror.
+> Report issues at **[git.coffeylabs.org/inbuxa/inbuxa-charts/issues](https://git.coffeylabs.org/inbuxa/inbuxa-charts/issues)**, join discussions at **[community.coffeylabs.org](https://community.coffeylabs.org)**, or chat on **[Discord](https://discord.gg/nqcY4TKfAn)**.
+
+> [!WARNING]
+> **In development.** The chart is being built for inbuxa 27.1 and has no
+> release yet: the first is `27.1.0-rc.1`, a release candidate, with the
+> install guide on [docs.inbuxa.org](https://docs.inbuxa.org). Until then,
+> nothing here is supported for running mail.
+
+The Helm chart for running **inbuxa** on Kubernetes: the mail server, the
+[webmail](https://git.coffeylabs.org/inbuxa/inbuxa-webmail) and the
+[console](https://git.coffeylabs.org/inbuxa/inbuxa-admin), against a
+PostgreSQL, NATS and S3 you provide. Every release is signed and pins its
+images by digest; see [Releases](#releases). The chart is tested end to end
+in [inbuxa-k8s-lab](https://git.coffeylabs.org/inbuxa/inbuxa-k8s-lab).
+
+## In this repository
 
 - `charts/inbuxa`: the chart, its values schema and its tests
 - `tools/check.sh`: every check CI runs; see [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -60,5 +88,9 @@ Installs on real clusters, the mail tests and the upgrade tests are in
 [inbuxa-k8s-lab](https://git.coffeylabs.org/inbuxa/inbuxa-k8s-lab). The guide
 is at [docs.inbuxa.org](https://docs.inbuxa.org/).
 
-Licensed under the [Apache License 2.0](LICENSE). The images the chart runs
-are licensed separately.
+## License
+
+The chart is free software under the [Apache License 2.0](LICENSE), and a
+Coffey Labs project. The images it runs are licensed separately: the server
+the webmail and the console under the AGPL-3.0, as their own repositories
+say.
