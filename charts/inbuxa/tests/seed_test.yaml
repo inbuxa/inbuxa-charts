@@ -104,3 +104,17 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: the chart makes a ConfigMap of that name
+
+  - it: runs after the upgrade under Argo CD (K-C14)
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PreSync
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-15"
+        documentIndex: 0
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-10"
+        documentIndex: 1

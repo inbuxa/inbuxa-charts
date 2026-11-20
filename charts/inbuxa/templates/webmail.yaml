@@ -19,6 +19,9 @@ the server inside the cluster, through the HTTP Service.
 {{- if and $wm.previousAppSecret (not $wm.existingSecret) }}
 {{- fail "webmail.previousAppSecret needs webmail.existingSecret: the chart's own Secret keeps only the two keys it makes" }}
 {{- end }}
+{{- if and (not $wm.existingSecret) (not $root.Values.generateSecrets) }}
+{{- fail "webmail.existingSecret: generateSecrets is off, so name a Secret with app-secret and oauth-client-secret (48 random characters each)" }}
+{{- end }}
 {{- if not $wm.existingSecret }}
 {{- /* Random once, then kept: a new APP_SECRET would sign everybody out */}}
 {{- $existing := (lookup "v1" "Secret" $root.Release.Namespace $name).data | default dict }}

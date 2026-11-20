@@ -20,7 +20,7 @@ Its token may create events in this namespace and nothing else.
 {{- fail "server.egress.checkUrl is required with server.egress.expectedAddresses: a URL that answers with the caller's address as plain text" }}
 {{- end }}
 {{- $name := printf "%s-egress-check" (include "inbuxa.fullname" $root) }}
-{{- $hook := dict "helm.sh/hook" "post-install,post-upgrade" "helm.sh/hook-delete-policy" "before-hook-creation" }}
+{{- $hook := dict "helm.sh/hook" "post-install,post-upgrade" "helm.sh/hook-delete-policy" "before-hook-creation" "argocd.argoproj.io/hook" "PostSync" "argocd.argoproj.io/hook-delete-policy" "BeforeHookCreation" }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -30,7 +30,7 @@ metadata:
     {{- include "inbuxa.labels" $root | nindent 4 }}
     app.kubernetes.io/component: egress-check
   annotations:
-    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10" "argocd.argoproj.io/sync-wave" "-10") $hook) | nindent 4 }}
 automountServiceAccountToken: false
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -42,7 +42,7 @@ metadata:
     {{- include "inbuxa.labels" $root | nindent 4 }}
     app.kubernetes.io/component: egress-check
   annotations:
-    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10" "argocd.argoproj.io/sync-wave" "-10") $hook) | nindent 4 }}
 rules:
   - apiGroups: [""]
     resources: ["events"]
@@ -57,7 +57,7 @@ metadata:
     {{- include "inbuxa.labels" $root | nindent 4 }}
     app.kubernetes.io/component: egress-check
   annotations:
-    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10" "argocd.argoproj.io/sync-wave" "-10") $hook) | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -76,7 +76,7 @@ metadata:
     {{- include "inbuxa.labels" $root | nindent 4 }}
     app.kubernetes.io/component: egress-check
   annotations:
-    {{- toYaml (merge (dict "helm.sh/hook-weight" "-5") $hook) | nindent 4 }}
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-5" "argocd.argoproj.io/sync-wave" "-5") $hook) | nindent 4 }}
 data:
   egress-check.sh: |
     {{- $root.Files.Get "files/egress-check.sh" | nindent 4 }}
@@ -90,7 +90,7 @@ metadata:
     {{- include "inbuxa.labels" $root | nindent 4 }}
     app.kubernetes.io/component: egress-check
   annotations:
-    {{- toYaml (merge (dict "helm.sh/hook-weight" "0") $hook) | nindent 4 }}
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "0" "argocd.argoproj.io/sync-wave" "0") $hook) | nindent 4 }}
     ignore-check.kube-linter.io/no-liveness-probe: "A one-shot that serves nothing; activeDeadlineSeconds bounds it"
     ignore-check.kube-linter.io/no-readiness-probe: "A one-shot that serves nothing"
     ignore-check.kube-linter.io/restart-policy: "Never on purpose: one answer is enough, and the script never fails"

@@ -326,3 +326,23 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "turn on routes.gateway or routes.ingress"
+
+  - it: refuses to make the webmail's Secret when generateSecrets is off (K-C14)
+    template: webmail.yaml
+    set:
+      generateSecrets: false
+    asserts:
+      - failedTemplate:
+          errorPattern: "webmail.existingSecret: generateSecrets is off"
+
+  - it: renders with generateSecrets off once the Secret is named
+    template: webmail.yaml
+    set:
+      generateSecrets: false
+      webmail.existingSecret: my-webmail
+    asserts:
+      - notFailedTemplate: {}
+      # No Secret of its own: the Deployment comes first
+      - isKind:
+          of: Deployment
+        documentIndex: 0

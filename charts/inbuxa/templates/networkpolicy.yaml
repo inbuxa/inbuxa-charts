@@ -173,7 +173,9 @@ spec:
     {{- include "inbuxa.networkPolicy.frontEndIngress" $root | nindent 4 }}
 {{- end }}
 {{- /* The two the hook Jobs need, as hooks; see the top of this file */}}
-{{- $hook := dict "helm.sh/hook" "pre-install,pre-upgrade,pre-rollback" "helm.sh/hook-weight" "-20" "helm.sh/hook-delete-policy" "before-hook-creation,hook-succeeded" }}
+{{- /* Argo CD runs Helm's pre-install and pre-upgrade hooks as PreSync; its
+own annotations give the same order there: these first (see server/upgrade.yaml) */}}
+{{- $hook := dict "helm.sh/hook" "pre-install,pre-upgrade,pre-rollback" "helm.sh/hook-weight" "-20" "helm.sh/hook-delete-policy" "before-hook-creation,hook-succeeded" "argocd.argoproj.io/hook" "PreSync" "argocd.argoproj.io/sync-wave" "-30" "argocd.argoproj.io/hook-delete-policy" "BeforeHookCreation,HookSucceeded" }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

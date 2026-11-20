@@ -282,6 +282,10 @@
         }
       }
     },
+    "generateSecrets": {
+      "type": "boolean",
+      "description": "Make the webmail's and the metrics Secrets when they aren't named. Set false under Argo CD or kubectl apply, which can't read them back: the chart then requires webmail.existingSecret and server.metrics.prometheus.existingSecret."
+    },
     "server": {
       "type": "object",
       "additionalProperties": false,

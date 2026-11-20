@@ -23,7 +23,14 @@ the older release can't read.
 {{- $deployments = append $deployments (printf "%s-%s" (include "inbuxa.fullname" $root) $group) }}
 {{- end }}
 {{- end }}
-{{- $hook := dict "helm.sh/hook" "pre-upgrade,pre-rollback" "helm.sh/hook-delete-policy" "before-hook-creation,hook-succeeded" }}
+{{- /*
+Argo CD runs these, and the seed, as PreSync on every sync, the first one
+included. So there the upgrade goes first: on a new store it finds nothing
+to do and changes nothing, and the seed after it still sees a new store.
+Seed first would be wrong: --seed upgrades the store's layout before it
+seeds, past the acknowledgement and the stop below.
+*/}}
+{{- $hook := dict "helm.sh/hook" "pre-upgrade,pre-rollback" "helm.sh/hook-delete-policy" "before-hook-creation,hook-succeeded" "argocd.argoproj.io/hook" "PreSync" "argocd.argoproj.io/hook-delete-policy" "BeforeHookCreation,HookSucceeded" }}
 {{- if $upgrade.stopServers }}
 apiVersion: v1
 kind: ServiceAccount
@@ -34,7 +41,7 @@ metadata:
     {{- include "inbuxa.labels" $root | nindent 4 }}
     app.kubernetes.io/component: upgrade
   annotations:
-    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10" "argocd.argoproj.io/sync-wave" "-25") $hook) | nindent 4 }}
 automountServiceAccountToken: false
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -46,7 +53,7 @@ metadata:
     {{- include "inbuxa.labels" $root | nindent 4 }}
     app.kubernetes.io/component: upgrade
   annotations:
-    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10" "argocd.argoproj.io/sync-wave" "-25") $hook) | nindent 4 }}
 rules:
   # Scale this release's server Deployments, and nothing else
   - apiGroups: ["apps"]
@@ -68,7 +75,7 @@ metadata:
     {{- include "inbuxa.labels" $root | nindent 4 }}
     app.kubernetes.io/component: upgrade
   annotations:
-    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10") $hook) | nindent 4 }}
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-10" "argocd.argoproj.io/sync-wave" "-25") $hook) | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -88,7 +95,7 @@ metadata:
     {{- include "inbuxa.labels" $root | nindent 4 }}
     app.kubernetes.io/component: upgrade
   annotations:
-    {{- toYaml (merge (dict "helm.sh/hook-weight" "-5") $hook) | nindent 4 }}
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "-5" "argocd.argoproj.io/sync-wave" "-22") $hook) | nindent 4 }}
 data:
   config.json: {{ toJson $server.dataStore | quote }}
   upgrade.sh: |
@@ -103,7 +110,7 @@ metadata:
     {{- include "inbuxa.labels" $root | nindent 4 }}
     app.kubernetes.io/component: upgrade
   annotations:
-    {{- toYaml (merge (dict "helm.sh/hook-weight" "0") $hook) | nindent 4 }}
+    {{- toYaml (merge (dict "helm.sh/hook-weight" "0" "argocd.argoproj.io/sync-wave" "-20") $hook) | nindent 4 }}
     ignore-check.kube-linter.io/no-liveness-probe: "A one-shot that serves nothing; activeDeadlineSeconds bounds it"
     ignore-check.kube-linter.io/no-readiness-probe: "A one-shot that serves nothing"
     ignore-check.kube-linter.io/restart-policy: "Never on purpose: a failed upgrade is for a person to look at, not to retry"
