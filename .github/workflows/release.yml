@@ -1,0 +1,319 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Releases the chart (K-C13). Runs on GitHub, where the repository is a
+# push-mirror of Gitea, because keyless signing needs GitHub's OIDC identity,
+# as the server, webmail and console images do. Gated on vars.BUILD_ON like
+# their workflows. Gitea's ci.yml still checks every pull request.
+#
+# A tag v27.1-rc.N releases chart 27.1.0-rc.N (v27.1.3 is 27.1.3, v27.1 is
+# 27.1.0):
+#   1. the images in release/suite.yaml: each one's signature is checked
+#      against the workflow of the repository it comes from, then its digest
+#      is resolved and pinned into values.yaml with its tag;
+#   2. the chart is linted and packaged, and pushed as OCI to GHCR and the
+#      Gitea registry, where cosign signs it keyless (and checks it);
+#   3. manifests rendered from ci/defaults-values.yaml, for people who apply
+#      YAML rather than run Helm, go in a tarball;
+#   4. SHA256SUMS over the chart and the tarball, signed with the inbuxa
+#      release key (minisign);
+#   5. a release on Gitea, with the files and the pinned images;
+#   6. `verify`, on a fresh runner with only what was published, runs
+#      tools/verify-release.sh, as someone installing would.
+#
+# Run by hand from main it makes a test release instead: chart
+# 0.0.0-test.<run>, pushed to oci://ghcr.io/inbuxa/charts-test, no Gitea
+# release, SHA256SUMS signed only when the key is there. Everything else is
+# the same, `verify` included.
+#
+# cosign and minisign/helm come at pinned versions, checked against pinned
+# SHA-256 sums (helm by tools/install-tools.sh); actions are pinned to
+# full commit SHAs.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  COSIGN_VERSION: v3.1.4
+  COSIGN_SHA256: 424e2c97d0b45fd7a6b608a87f090f35633f4c23ece5f092d48bba11aaf4bbfa
+  ISSUER: https://token.actions.githubusercontent.com
+
+jobs:
+  release:
+    if: ${{ vars.BUILD_ON == 'github' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # The certificate's identity, from GitHub's OIDC token
+      id-token: write
+      # The chart on GHCR
+      packages: write
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      test: ${{ steps.v.outputs.test }}
+      ghcr: ${{ steps.v.outputs.ghcr }}
+    steps:
+      - id: v
+        env:
+          EVENT: ${{ github.event_name }}
+          RUN: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = workflow_dispatch ]; then
+            [ "$GITHUB_REF" = refs/heads/main ] || { echo "::error::a test release runs from main"; exit 1; }
+            echo "version=0.0.0-test.$RUN" >> "$GITHUB_OUTPUT"
+            echo "test=true" >> "$GITHUB_OUTPUT"
+            echo "ghcr=oci://ghcr.io/inbuxa/charts-test" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          tag="$GITHUB_REF_NAME"
+          [[ "$tag" =~ ^v([0-9]{2})\.([0-9]+)(\.([0-9]+))?(-rc\.[0-9]+)?$ ]] ||
+            { echo "::error::not a chart release tag: $tag"; exit 1; }
+          v="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[4]:-0}${BASH_REMATCH[5]}"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "test=false" >> "$GITHUB_OUTPUT"
+          echo "ghcr=oci://ghcr.io/inbuxa/charts" >> "$GITHUB_OUTPUT"
+          echo "$tag -> chart $v"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: tools, checked against their pinned sums
+        run: |
+          set -euo pipefail
+          tools/install-tools.sh "$RUNNER_TEMP/bin" >/dev/null
+          cd "$RUNNER_TEMP"
+          curl -fsSL -o cosign "https://github.com/sigstore/cosign/releases/download/$COSIGN_VERSION/cosign-linux-amd64"
+          echo "$COSIGN_SHA256  cosign" | sha256sum -c -
+          install -m 0755 cosign bin/cosign
+          sudo apt-get -qq update >/dev/null && sudo apt-get -qq install -y --no-install-recommends minisign >/dev/null
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - run: |
+          helm version --short
+          cosign version | grep -i gitversion
+
+      # 1. The images, each checked against the workflow that signed it,
+      #    by digest, so the digest pinned is the one checked
+      - name: the suite's images, checked and resolved
+        run: |
+          set -euo pipefail
+          python3 - <<'EOF' > suite.tsv
+          import re
+          for line in open("release/suite.yaml"):
+              m = re.match(r"^(server|webmail|console):\s*(\S+)\s*$", line)
+              if m: print(*m.groups(), sep="\t")
+          EOF
+          [ "$(wc -l < suite.tsv)" = 3 ] || { echo "::error::release/suite.yaml must name server, webmail and console"; cat suite.tsv; exit 1; }
+          echo '{}' > digests.json
+          while IFS=$'\t' read -r name tag; do
+            case "$name" in
+              server)  repo=inbuxa-server;  id='^https://github\.com/inbuxa/inbuxa-server/\.github/workflows/sign\.yml@refs/(tags/v.+|heads/main)$' ;;
+              webmail) repo=inbuxa-webmail; id='^https://github\.com/inbuxa/inbuxa-webmail/\.github/workflows/sign\.yml@refs/(tags/inbuxa-v.+|heads/main)$' ;;
+              console) repo=inbuxa-admin;   id='^https://github\.com/inbuxa/inbuxa-admin/\.github/workflows/sign\.yml@refs/(tags/v.+|heads/main)$' ;;
+            esac
+            image="ghcr.io/inbuxa/$repo"
+            digest="$(docker buildx imagetools inspect "$image:$tag" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::$image:$tag: no digest"; exit 1; }
+            cosign verify "$image@$digest" --certificate-oidc-issuer "$ISSUER" \
+              --certificate-identity-regexp "$id" >/dev/null ||
+              { echo "::error::$image:$tag ($digest) isn't signed by $repo's sign.yml"; exit 1; }
+            echo "$name $image:$tag $digest: signed"
+            jq --arg n "$name" --arg t "$tag" --arg d "$digest" '.[$n] = {tag: $t, digest: $d}' digests.json > d.json
+            mv d.json digests.json
+          done < suite.tsv
+
+      # 2. The chart, stamped, checked, packaged
+      - name: package
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 tools/release-stamp.py "$VERSION" digests.json
+          for values in charts/inbuxa/ci/*-values.yaml; do
+            helm lint --strict charts/inbuxa -f "$values" >/dev/null
+          done
+          mkdir -p out
+          helm package charts/inbuxa -d out
+          ls -l out
+
+      # 3. Rendered manifests, for applying without Helm
+      - name: rendered manifests
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          d="inbuxa-$VERSION-manifests"
+          mkdir -p "$d"
+          cp charts/inbuxa/ci/defaults-values.yaml "$d/values.yaml"
+          helm template inbuxa "out/inbuxa-$VERSION.tgz" --namespace inbuxa \
+            -f "$d/values.yaml" > "$d/inbuxa.yaml"
+          cat > "$d/README" <<EOF
+          inbuxa chart $VERSION, rendered with Helm from values.yaml here into
+          inbuxa.yaml, for namespace inbuxa and release name inbuxa.
+
+          It's an example: values.yaml names a PostgreSQL data store at
+          pg-rw.data.svc with its password in the Secret inbuxa-data. Change
+          values.yaml and render your own with
+            helm template inbuxa oci://ghcr.io/inbuxa/charts/inbuxa --version $VERSION -n inbuxa -f values.yaml
+          or edit inbuxa.yaml before applying it.
+          EOF
+          tar --owner=0 --group=0 --sort=name --mtime='@0' -czf "out/$d.tar.gz" "$d"
+          grep -c '^kind:' "$d/inbuxa.yaml" | xargs echo "objects:"
+
+      # 4. Pushed and signed, by digest
+      - name: push and sign
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          GHCR: ${{ steps.v.outputs.ghcr }}
+          TEST: ${{ steps.v.outputs.test }}
+          REGISTRY: ${{ vars.REGISTRY }}
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "$TEST" = true ]; then id='^https://github\.com/inbuxa/inbuxa-charts/\.github/workflows/release\.yml@refs/heads/main$'
+          else id='^https://github\.com/inbuxa/inbuxa-charts/\.github/workflows/release\.yml@refs/tags/v.+$'; fi
+          push() {  # oci://registry/path
+            local out digest ref
+            out="$(helm push "out/inbuxa-$VERSION.tgz" "$1" 2>&1)"; echo "$out"
+            digest="$(sed -n 's/^Digest: //p' <<<"$out")"
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::no digest from helm push to $1"; exit 1; }
+            ref="${1#oci://}/inbuxa@$digest"
+            cosign sign --yes "$ref"
+            cosign verify "$ref" --certificate-oidc-issuer "$ISSUER" --certificate-identity-regexp "$id" >/dev/null
+            echo "signed and verified $ref"
+            echo "$ref" >> out/pushed
+          }
+          echo "$GH_TOKEN" | helm registry login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          echo "$GH_TOKEN" | cosign login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          push "$GHCR"
+          if [ "$TEST" != true ]; then
+            [ -n "$GITEA_TOKEN" ] || { echo "::error::GITEA_TOKEN is needed for a release"; exit 1; }
+            echo "$GITEA_TOKEN" | helm registry login "$REGISTRY" -u jcoffey-dev --password-stdin
+            echo "$GITEA_TOKEN" | cosign login "$REGISTRY" -u jcoffey-dev --password-stdin
+            push "oci://$REGISTRY/inbuxa/charts"
+          fi
+
+      # 5. Checksums, signed with the release key when it's there
+      - name: SHA256SUMS
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          TEST: ${{ steps.v.outputs.test }}
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          cd out
+          sha256sum "inbuxa-$VERSION.tgz" "inbuxa-$VERSION-manifests.tar.gz" > SHA256SUMS
+          cat SHA256SUMS
+          if [ -z "${MINISIGN_SECRET_KEY:-}" ]; then
+            [ "$TEST" = true ] || { echo "::error::MINISIGN_SECRET_KEY is needed for a release"; exit 1; }
+            echo "::warning::MINISIGN_SECRET_KEY is not set; this test release's SHA256SUMS is unsigned"
+            exit 0
+          fi
+          key="$(mktemp)"; printf '%s\n' "$MINISIGN_SECRET_KEY" > "$key"
+          minisign -S -s "$key" -m SHA256SUMS -t "inbuxa chart $VERSION" </dev/null
+          rm -f "$key"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release
+          path: |
+            out/*
+            digests.json
+          retention-days: 30
+          if-no-files-found: error
+
+      # 6. The release page, last, so it never lists what isn't there
+      - name: release on Gitea
+        if: ${{ steps.v.outputs.test != 'true' }}
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          GITEA_URL: ${{ vars.GITEA_URL }}
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          set -euo pipefail
+          api="$GITEA_URL/api/v1/repos/$GITHUB_REPOSITORY"
+          auth="Authorization: token $GITEA_TOKEN"
+          retry=(--retry 5 --retry-all-errors --retry-delay 15)
+          if [[ "$VERSION" == *-* ]]; then pre=true; else pre=false; fi
+          body="$(jq -r --arg v "$VERSION" '
+            "inbuxa chart \($v).\n\n" +
+            "    helm install inbuxa oci://ghcr.io/inbuxa/charts/inbuxa --version \($v) -n inbuxa -f values.yaml\n\n" +
+            "Images, pinned by digest:\n\n" +
+            ([to_entries[] | "- \(.key) `\(.value.tag)` `\(.value.digest)`"] | join("\n")) +
+            "\n\nCheck it with `tools/verify-release.sh \($v)`: the chart'"'"'s and the images'"'"' signatures, and SHA256SUMS."
+            ' digests.json)"
+          if ! rel="$(curl -fsS "${retry[@]}" -H "$auth" "$api/releases/tags/$GITHUB_REF_NAME" 2>/dev/null)"; then
+            rel="$(jq -n --arg t "$GITHUB_REF_NAME" --arg b "$body" --argjson p "$pre" \
+                     '{tag_name:$t, name:$t, body:$b, prerelease:$p}' |
+                   curl -fsS "${retry[@]}" -H "$auth" -H 'Content-Type: application/json' --data @- "$api/releases")"
+          fi
+          id="$(jq -r .id <<<"$rel")"
+          for f in out/inbuxa-*.tgz out/inbuxa-*-manifests.tar.gz out/SHA256SUMS out/SHA256SUMS.minisig; do
+            name="$(basename "$f")"
+            for old in $(jq -r --arg n "$name" '.assets[]? | select(.name == $n) | .id' <<<"$rel"); do
+              curl -fsS "${retry[@]}" -o /dev/null -X DELETE -H "$auth" "$api/releases/$id/assets/$old"
+            done
+            curl -fsS --http1.1 "${retry[@]}" -o /dev/null -X POST -H "$auth" \
+              -F "attachment=@$f" "$api/releases/$id/assets?name=$name"
+            echo "attached $name"
+          done
+
+  # What someone installing does, on a runner that has only what was
+  # published: the release's files (from the run, for a test release; from
+  # the release page otherwise) and the registry
+  verify:
+    if: ${{ vars.BUILD_ON == 'github' }}
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: tools
+      - name: tools, checked against their pinned sums
+        run: |
+          set -euo pipefail
+          tools/install-tools.sh "$RUNNER_TEMP/bin" >/dev/null
+          cd "$RUNNER_TEMP"
+          curl -fsSL -o cosign "https://github.com/sigstore/cosign/releases/download/$COSIGN_VERSION/cosign-linux-amd64"
+          echo "$COSIGN_SHA256  cosign" | sha256sum -c -
+          install -m 0755 cosign bin/cosign
+          sudo apt-get -qq update >/dev/null && sudo apt-get -qq install -y --no-install-recommends minisign >/dev/null
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - if: ${{ needs.release.outputs.test == 'true' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release
+          path: files
+      # A test chart's GHCR package is private until made public; read it
+      # with the run's token. A release's is public, and read anonymously.
+      - if: ${{ needs.release.outputs.test == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "$GH_TOKEN" | helm registry login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          echo "$GH_TOKEN" | cosign login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - env:
+          TEST: ${{ needs.release.outputs.test }}
+          GHCR: ${{ needs.release.outputs.ghcr }}
+        run: |
+          set -euo pipefail
+          if [ "$TEST" = true ]; then
+            tools/verify-release.sh --test --chart "$GHCR" --files files/out "$VERSION"
+          else
+            tools/verify-release.sh --chart "$GHCR" "$VERSION"
+          fi
