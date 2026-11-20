@@ -114,8 +114,10 @@ runs, pinned by digest.
   from anywhere and connects anywhere; `networkPolicy.httpFrom` and
   `networkPolicy.serverEgress` narrow its HTTP port and its egress. The
   webmail reaches DNS, the server and the web (`networkPolicy.webmailInternet`
-  for remote images); the console reaches nothing. Every pod passes Pod
-  Security "restricted", tested in enforce mode.
+  for remote images); the console reaches nothing. The seed and upgrade
+  Jobs, which run before the release's own policies exist on a first
+  install, are covered by copies of the two they need, run as hooks first.
+  Every pod passes Pod Security "restricted", tested in enforce mode.
 - Releases (K-C13): a `v*` tag releases the chart from `release/suite.yaml`,
   with the server, webmail and console images pinned by digest once their
   signatures check out; the chart pushed to GHCR and the Gitea registry and

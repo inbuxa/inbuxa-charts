@@ -147,3 +147,52 @@ tests:
             - {port: 10465, protocol: TCP}
             - {port: 10993, protocol: TCP}
             - {port: 14190, protocol: TCP}
+
+  # A first install runs the seed before the release's own objects exist
+  - it: covers the hook Jobs with a deny-all that is itself a hook, run first
+    documentSelector:
+      path: metadata.name
+      value: mail-inbuxa-hooks-deny-all
+    asserts:
+      - equal:
+          path: metadata.annotations
+          value:
+            helm.sh/hook: pre-install,pre-upgrade,pre-rollback
+            helm.sh/hook-weight: "-20"
+            helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+      - equal:
+          path: spec.podSelector.matchLabels
+          value: {app.kubernetes.io/name: inbuxa, app.kubernetes.io/instance: mail}
+      - equal:
+          path: spec.policyTypes
+          value: [Ingress, Egress]
+      - notExists:
+          path: spec.podSelector.matchExpressions
+      - notExists:
+          path: spec.ingress
+      - notExists:
+          path: spec.egress
+
+  - it: lets the hook Jobs out as the server, as a hook too
+    documentSelector:
+      path: metadata.name
+      value: mail-inbuxa-hooks-jobs
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "-20"
+      - equal:
+          path: spec.podSelector.matchExpressions
+          value:
+            - {key: app.kubernetes.io/component, operator: In, values: [seed, upgrade]}
+      - notExists:
+          path: spec.ingress
+      - isNotEmpty:
+          path: spec.egress
+
+  - it: makes no hook policies when policies are off
+    set:
+      networkPolicy.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
