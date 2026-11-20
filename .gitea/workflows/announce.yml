@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Announce each published chart release on the community forum, as the rest
+# of the suite does (coffey-labs/actions discourse-release; release-map.json
+# puts this repo in inbuxa Releases, and a pre-release such as 27.1.0-rc.N in
+# inbuxa Release Candidates). Safe to re-run: one topic per tag. Discord's
+# #releases gets it from this repo's release webhook.
+#
+# The release workflow (.github/workflows/release.yml) makes the Gitea
+# release with a person's token, not the Actions bot's, so `on: release`
+# fires for it. Test releases (0.0.0-test.N) make no Gitea release.
+name: announce
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    runs-on: light
+    steps:
+      - uses: coffey-labs/actions/discourse-release@8995eec07562ffb4cd94dc39f444cd9bcac349c9
+        with:
+          api-key: ${{ secrets.DISCOURSE_RELEASE_KEY }}
