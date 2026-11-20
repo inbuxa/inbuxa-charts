@@ -1,2 +1,3 @@
 # Tools from tools/install-tools.sh
 .tools/
+__pycache__/

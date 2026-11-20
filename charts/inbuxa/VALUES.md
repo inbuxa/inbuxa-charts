@@ -8,42 +8,42 @@ Every value the chart takes, with its default and what the values
 schema allows. A value the schema doesn't name is refused, as is one
 outside these limits, before anything is applied.
 
-- **`nameOverride`** (string)
-  Default: `""`.
-  Allowed: at most 40 characters; matching `^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$`.
+- **`nameOverride`** (string)\
+  Default: `""`.\
+  Allowed: at most 40 characters; matching `^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$`.\
   Overrides the "inbuxa" in the names of everything the chart creates.
 
-- **`fullnameOverride`** (string)
-  Default: `""`.
-  Allowed: at most 52 characters; matching `^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$`.
+- **`fullnameOverride`** (string)\
+  Default: `""`.\
+  Allowed: at most 52 characters; matching `^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$`.\
   Overrides the whole name (release name plus chart name).
 
-- **`imagePullSecrets`** (list of object)
+- **`imagePullSecrets`** (list of object)\
   Default: `[]`.
 
 ## `server`
 
 ### `server.image`
 
-- **`server.image.repository`** (string)
-  Default: `ghcr.io/inbuxa/inbuxa-server`.
+- **`server.image.repository`** (string)\
+  Default: `ghcr.io/inbuxa/inbuxa-server`.\
   Allowed: at least 1 character.
 
-- **`server.image.tag`** (string)
-  Default: `""`.
+- **`server.image.tag`** (string)\
+  Default: `""`.\
   Defaults to the chart's appVersion
 
-- **`server.image.digest`** (string)
-  Default: `""`.
-  Allowed: matching `^(sha256:[a-f0-9]{64})?$`.
+- **`server.image.digest`** (string)\
+  Default: `""`.\
+  Allowed: matching `^(sha256:[a-f0-9]{64})?$`.\
   sha256:..., which wins over the tag when set
 
-- **`server.image.pullPolicy`** (string)
-  Default: `IfNotPresent`.
+- **`server.image.pullPolicy`** (string)\
+  Default: `IfNotPresent`.\
   Allowed: one of `"Always"`, `"IfNotPresent"`, `"Never"`.
 
-- **`server.dataStore`** (object)
-  Default: `{}`.
+- **`server.dataStore`** (object)\
+  Default: `{}`.\
   The data store, written as the server's config.json. Required. A secret in it is a File reference to a path under /etc/inbuxa/secrets, never the secret itself. For example:
 
   ```yaml
@@ -56,8 +56,8 @@ outside these limits, before anything is applied.
   useTls: true
   ```
 
-- **`server.secretMounts`** (list of object)
-  Default: `[]`.
+- **`server.secretMounts`** (list of object)\
+  Default: `[]`.\
   Secrets mounted under /etc/inbuxa/secrets, where the data store, blob store and coordinator settings point with File references. Each entry is an existing Secret and the keys to mount from it:
 
   ```yaml
@@ -69,58 +69,58 @@ outside these limits, before anything is applied.
 
 The new store's setup, applied once on install, before any server pod starts: the domain, administrator, blob store, coordinator and cluster roles the groups below name. A JMAP request body ("using" and "methodCalls"), the calls an administrator would send to /jmap, run as the system administrator. A value {"$file": /path} is replaced by that file's contents: put secrets in seed.secretMounts, never in the seed. Ignored by a store that's set up already. See the server's --seed.
 
-- **`server.seed.enabled`** (boolean)
+- **`server.seed.enabled`** (boolean)\
   Default: `false`.
 
-- **`server.seed.request`** (object)
-  Default: `{}`.
+- **`server.seed.request`** (object)\
+  Default: `{}`.\
   The seed, as values
 
-- **`server.seed.existingConfigMap`** (string)
-  Default: `""`.
+- **`server.seed.existingConfigMap`** (string)\
+  Default: `""`.\
   Or an existing ConfigMap with it under the key seed.json
 
-- **`server.seed.secretMounts`** (list of object)
-  Default: `[]`.
+- **`server.seed.secretMounts`** (list of object)\
+  Default: `[]`.\
   Secrets only the seed run sees, at /etc/inbuxa/seed-secrets, in the same form as secretMounts
 
-- **`server.seed.timeoutSeconds`** (integer)
-  Default: `600`.
+- **`server.seed.timeoutSeconds`** (integer)\
+  Default: `600`.\
   Allowed: at least 30.
 
-- **`server.seed.resources`** (object)
-  Default: `{}`.
+- **`server.seed.resources`** (object)\
+  Default: `{}`.\
   Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, as quantities (100m, 256Mi).
 
 ### `server.upgrade`
 
 Before an upgrade rolls new pods out, a Job on the new image asks the server what the upgrade does to the store, and upgrades it. Give `helm upgrade` a --timeout long enough for it: 20m covers a layout step that has to wait for the old pods' heartbeats to run out.
 
-- **`server.upgrade.enabled`** (boolean)
+- **`server.upgrade.enabled`** (boolean)\
   Default: `true`.
 
-- **`server.upgrade.acknowledgeLayout`** (integer)
-  Default: `0`.
-  Allowed: at least 0.
+- **`server.upgrade.acknowledgeLayout`** (integer)\
+  Default: `0`.\
+  Allowed: at least 0.\
   A change to the store's layout can't be undone without a backup taken before it. The upgrade refuses one until this names the layout version it moves to (the refusal says which): 3 for the 27.1 crossing.
 
-- **`server.upgrade.stopServers`** (boolean)
-  Default: `true`.
+- **`server.upgrade.stopServers`** (boolean)\
+  Default: `true`.\
   When a layout step needs every server pod stopped, scale the server Deployments to 0 first (mail is down until the rollout). Off: the upgrade waits for them to stop, and fails if they don't.
 
-- **`server.upgrade.timeoutSeconds`** (integer)
-  Default: `1800`.
+- **`server.upgrade.timeoutSeconds`** (integer)\
+  Default: `1800`.\
   Allowed: at least 60.
 
-- **`server.upgrade.resources`** (object)
-  Default: `{}`.
+- **`server.upgrade.resources`** (object)\
+  Default: `{}`.\
   Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, as quantities (100m, 256Mi).
 
 ### `server.check`
 
 Before each server pod starts, an init container checks the data layer (`inbuxa --check`): it opens the data store, writes, reads and deletes a small object in the blob store, and connects to NATS. A pod that can't use one stays in Init:Error, and its status names the part and why (kubectl describe pod). Needs server 27.1-rc.33 or later.
 
-- **`server.check.enabled`** (boolean)
+- **`server.check.enabled`** (boolean)\
   Default: `true`.
 
 #### `server.check.resources`
@@ -129,63 +129,63 @@ Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, 
 
 #### `server.check.resources.requests`
 
-- **`server.check.resources.requests.cpu`** (string or number)
+- **`server.check.resources.requests.cpu`** (string or number)\
   Default: `50m`.
 
-- **`server.check.resources.requests.memory`** (string or number)
+- **`server.check.resources.requests.memory`** (string or number)\
   Default: `64Mi`.
 
 #### `server.check.resources.limits`
 
-- **`server.check.resources.limits.memory`** (string or number)
+- **`server.check.resources.limits.memory`** (string or number)\
   Default: `256Mi`.
 
-- **`server.publicUrl`** (string)
-  Default: `""`.
-  Allowed: matching `^(https://[^/\s]+)?$`.
+- **`server.publicUrl`** (string)\
+  Default: `""`.\
+  Allowed: matching `^(https://[^/\s]+)?$`.\
   Where browsers and clients reach the server, as https://host. Sign-in pages and OAuth metadata name it.
 
-- **`server.trustedProxies`** (list of string)
-  Default: `[]`.
+- **`server.trustedProxies`** (list of string)\
+  Default: `[]`.\
   The proxies whose X-Forwarded-For the server believes, as CIDRs: the ingress or gateway, and the webmail. The server reads the header so that its limits and bans for failed sign-ins count each client, not the proxy. Empty: loopback and the private ranges, which covers pods on most clusters. List your pod network here if it isn't private (100.64.0.0/10, say).
 
 ### `server.listeners`
 
 The port in the pod of each listener a new store gets, which is what the Services send traffic to. 0 leaves that listener out. The pods may listen below 1024 without any privilege: they set the namespaced sysctl net.ipv4.ip_unprivileged_port_start, which Pod Security "restricted" allows. SMTP stays on 25: the server's default rules tell mail from the internet from submissions by local port 25. Used once, when the store is new; after that the listeners are settings in the console, and these have to match them.
 
-- **`server.listeners.smtp`** (integer)
-  Default: `25`.
-  Allowed: one of `0`, `25`.
+- **`server.listeners.smtp`** (integer)\
+  Default: `25`.\
+  Allowed: one of `0`, `25`.\
   25, or 0 for no SMTP. The server's default rules treat only port 25 as mail from the internet, so SMTP can't move.
 
-- **`server.listeners.submissions`** (integer)
-  Default: `465`.
-  Allowed: at least 0; at most 65535.
+- **`server.listeners.submissions`** (integer)\
+  Default: `465`.\
+  Allowed: at least 0; at most 65535.\
   A port in the pod, or 0 to leave the listener out.
 
-- **`server.listeners.imaps`** (integer)
-  Default: `993`.
-  Allowed: at least 0; at most 65535.
+- **`server.listeners.imaps`** (integer)\
+  Default: `993`.\
+  Allowed: at least 0; at most 65535.\
   A port in the pod, or 0 to leave the listener out.
 
-- **`server.listeners.pop3s`** (integer)
-  Default: `0`.
-  Allowed: at least 0; at most 65535.
+- **`server.listeners.pop3s`** (integer)\
+  Default: `0`.\
+  Allowed: at least 0; at most 65535.\
   A port in the pod, or 0 to leave the listener out.
 
-- **`server.listeners.sieve`** (integer)
-  Default: `4190`.
-  Allowed: at least 0; at most 65535.
+- **`server.listeners.sieve`** (integer)\
+  Default: `4190`.\
+  Allowed: at least 0; at most 65535.\
   A port in the pod, or 0 to leave the listener out.
 
-- **`server.listeners.https`** (integer)
-  Default: `443`.
-  Allowed: at least 0; at most 65535.
+- **`server.listeners.https`** (integer)\
+  Default: `443`.\
+  Allowed: at least 0; at most 65535.\
   A port in the pod, or 0 to leave the listener out.
 
-- **`server.listeners.http`** (integer)
-  Default: `8080`.
-  Allowed: at least 1; at most 65535.
+- **`server.listeners.http`** (integer)\
+  Default: `8080`.\
+  Allowed: at least 1; at most 65535.\
   Plain HTTP, which the probes use, so it can't be left out.
 
 ### `server.groups`
@@ -196,126 +196,126 @@ The server's role groups, each a Deployment. INBUXA_ROLE names a role (a Cluster
 
 Client protocols, web and JMAP; no outbound delivery, no scheduler
 
-- **`server.groups.front.enabled`** (boolean)
+- **`server.groups.front.enabled`** (boolean)\
   Default: `true`.
 
-- **`server.groups.front.replicas`** (integer)
-  Default: `2`.
+- **`server.groups.front.replicas`** (integer)\
+  Default: `2`.\
   Allowed: at least 0.
 
-- **`server.groups.front.role`** (string)
-  Default: `peer`.
+- **`server.groups.front.role`** (string)\
+  Default: `peer`.\
   The registry ClusterRole the group's pods run as; empty runs every task.
 
-- **`server.groups.front.resources`** (object)
-  Default: `{}`.
+- **`server.groups.front.resources`** (object)\
+  Default: `{}`.\
   Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, as quantities (100m, 256Mi).
 
-- **`server.groups.front.nodeSelector`** (map of string)
+- **`server.groups.front.nodeSelector`** (map of string)\
   Default: `{}`.
 
-- **`server.groups.front.tolerations`** (list of object)
+- **`server.groups.front.tolerations`** (list of object)\
   Default: `[]`.
 
-- **`server.groups.front.affinity`** (object)
+- **`server.groups.front.affinity`** (object)\
   Default: `{}`.
 
-- **`server.groups.front.podAnnotations`** (map of string)
+- **`server.groups.front.podAnnotations`** (map of string)\
   Default: `{}`.
 
-- **`server.groups.front.podLabels`** (map of string)
-  Default: `{}`.
+- **`server.groups.front.podLabels`** (map of string)\
+  Default: `{}`.\
   Extra labels on the pods, for what selects them by label: an egress gateway policy, say. Not app.kubernetes.io/ or inbuxa.org/ ones.
 
-- **`server.groups.front.extraEnv`** (list of object)
+- **`server.groups.front.extraEnv`** (list of object)\
   Default: `[]`.
 
 #### `server.groups.mta`
 
 As front, plus outbound delivery. Place it where its egress address is the one your SPF and PTR records name: on nodes with a fixed address (nodeSelector, tolerations), or behind an egress gateway that selects it (podLabels). server.egress checks it.
 
-- **`server.groups.mta.enabled`** (boolean)
+- **`server.groups.mta.enabled`** (boolean)\
   Default: `true`.
 
-- **`server.groups.mta.replicas`** (integer)
-  Default: `2`.
+- **`server.groups.mta.replicas`** (integer)\
+  Default: `2`.\
   Allowed: at least 0.
 
-- **`server.groups.mta.role`** (string)
-  Default: `peer-mta`.
+- **`server.groups.mta.role`** (string)\
+  Default: `peer-mta`.\
   The registry ClusterRole the group's pods run as; empty runs every task.
 
-- **`server.groups.mta.resources`** (object)
-  Default: `{}`.
+- **`server.groups.mta.resources`** (object)\
+  Default: `{}`.\
   Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, as quantities (100m, 256Mi).
 
-- **`server.groups.mta.nodeSelector`** (map of string)
+- **`server.groups.mta.nodeSelector`** (map of string)\
   Default: `{}`.
 
-- **`server.groups.mta.tolerations`** (list of object)
+- **`server.groups.mta.tolerations`** (list of object)\
   Default: `[]`.
 
-- **`server.groups.mta.affinity`** (object)
+- **`server.groups.mta.affinity`** (object)\
   Default: `{}`.
 
-- **`server.groups.mta.podAnnotations`** (map of string)
+- **`server.groups.mta.podAnnotations`** (map of string)\
   Default: `{}`.
 
-- **`server.groups.mta.podLabels`** (map of string)
-  Default: `{}`.
+- **`server.groups.mta.podLabels`** (map of string)\
+  Default: `{}`.\
   Extra labels on the pods, for what selects them by label: an egress gateway policy, say. Not app.kubernetes.io/ or inbuxa.org/ ones.
 
-- **`server.groups.mta.extraEnv`** (list of object)
+- **`server.groups.mta.extraEnv`** (list of object)\
   Default: `[]`.
 
 #### `server.groups.core`
 
 Everything, including the task scheduler. Exactly one replica: a second would queue every maintenance task twice.
 
-- **`server.groups.core.enabled`** (boolean)
+- **`server.groups.core.enabled`** (boolean)\
   Default: `true`.
 
-- **`server.groups.core.replicas`** (integer)
-  Default: `1`.
-  Allowed: at least 0; at most 1.
+- **`server.groups.core.replicas`** (integer)\
+  Default: `1`.\
+  Allowed: at least 0; at most 1.\
   0 or 1: a second core would queue every maintenance task twice.
 
-- **`server.groups.core.role`** (string)
-  Default: `""`.
+- **`server.groups.core.role`** (string)\
+  Default: `""`.\
   The registry ClusterRole the group's pods run as; empty runs every task.
 
-- **`server.groups.core.resources`** (object)
-  Default: `{}`.
+- **`server.groups.core.resources`** (object)\
+  Default: `{}`.\
   Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, as quantities (100m, 256Mi).
 
-- **`server.groups.core.nodeSelector`** (map of string)
+- **`server.groups.core.nodeSelector`** (map of string)\
   Default: `{}`.
 
-- **`server.groups.core.tolerations`** (list of object)
+- **`server.groups.core.tolerations`** (list of object)\
   Default: `[]`.
 
-- **`server.groups.core.affinity`** (object)
+- **`server.groups.core.affinity`** (object)\
   Default: `{}`.
 
-- **`server.groups.core.podAnnotations`** (map of string)
+- **`server.groups.core.podAnnotations`** (map of string)\
   Default: `{}`.
 
-- **`server.groups.core.podLabels`** (map of string)
-  Default: `{}`.
+- **`server.groups.core.podLabels`** (map of string)\
+  Default: `{}`.\
   Extra labels on the pods, for what selects them by label: an egress gateway policy, say. Not app.kubernetes.io/ or inbuxa.org/ ones.
 
-- **`server.groups.core.extraEnv`** (list of object)
+- **`server.groups.core.extraEnv`** (list of object)\
   Default: `[]`.
 
 ### `server.egress`
 
 The addresses outbound mail should leave from: the ones with reverse DNS (PTR) records and in your SPF. When set, a Job placed like the mta pods asks checkUrl which address it came from after each install and upgrade, and records the answer on the mta Deployment as an event: a Warning when it isn't one of these (kubectl get events). checkUrl answers a GET with the caller's address as plain text; pick one you trust, as it sees your cluster's address.
 
-- **`server.egress.expectedAddresses`** (list of string)
+- **`server.egress.expectedAddresses`** (list of string)\
   Default: `[]`.
 
-- **`server.egress.checkUrl`** (string)
-  Default: `""`.
+- **`server.egress.checkUrl`** (string)\
+  Default: `""`.\
   Allowed: matching `^(https?://\S+)?$`.
 
 ### `server.certificates`
@@ -332,28 +332,28 @@ chart ask cert-manager for one. The pods reread them within about two
 minutes of a renewal, with no restart. Needs server 27.1-rc.33.
 ```
 
-- **`server.certificates.acmeHosts`** (list of string)
+- **`server.certificates.acmeHosts`** (list of string)\
   Default: `[]`.
 
-- **`server.certificates.secrets`** (list of string)
-  Default: `[]`.
+- **`server.certificates.secrets`** (list of string)\
+  Default: `[]`.\
   Names of Secrets in this namespace, each with tls.crt and tls.key
 
 #### `server.certificates.certManager`
 
-- **`server.certificates.certManager.enabled`** (boolean)
+- **`server.certificates.certManager.enabled`** (boolean)\
   Default: `false`.
 
-- **`server.certificates.certManager.issuerRef`** (object)
-  Default: `{}`.
+- **`server.certificates.certManager.issuerRef`** (object)\
+  Default: `{}`.\
   The Issuer or ClusterIssuer, e.g. {name: letsencrypt, kind: ClusterIssuer}
 
-- **`server.certificates.certManager.dnsNames`** (list of string)
-  Default: `[]`.
+- **`server.certificates.certManager.dnsNames`** (list of string)\
+  Default: `[]`.\
   The mail host names, e.g. [mail.example.org, mx.example.org]
 
-- **`server.certificates.certManager.renewBefore`** (string)
-  Default: `""`.
+- **`server.certificates.certManager.renewBefore`** (string)\
+  Default: `""`.\
   Renew this long before expiry; empty is cert-manager's default
 
 ### `server.resources`
@@ -362,46 +362,46 @@ Used for every group that sets no resources of its own
 
 #### `server.resources.requests`
 
-- **`server.resources.requests.cpu`** (string or number)
+- **`server.resources.requests.cpu`** (string or number)\
   Default: `250m`.
 
-- **`server.resources.requests.memory`** (string or number)
+- **`server.resources.requests.memory`** (string or number)\
   Default: `512Mi`.
 
 #### `server.resources.limits`
 
-- **`server.resources.limits.cpu`** (string or number)
+- **`server.resources.limits.cpu`** (string or number)\
   Default: `"2"`.
 
-- **`server.resources.limits.memory`** (string or number)
+- **`server.resources.limits.memory`** (string or number)\
   Default: `2Gi`.
 
-- **`server.terminationGracePeriodSeconds`** (integer)
-  Default: `120`.
-  Allowed: at least 0.
+- **`server.terminationGracePeriodSeconds`** (integer)\
+  Default: `120`.\
+  Allowed: at least 0.\
   Time for SMTP sessions in progress to finish when a pod stops
 
 ### `server.topologySpread`
 
 Pods of a group are spread across nodes (never two on one node while another node has room) and, where the cluster has zones, across zones.
 
-- **`server.topologySpread.nodes`** (string)
-  Default: `DoNotSchedule`.
+- **`server.topologySpread.nodes`** (string)\
+  Default: `DoNotSchedule`.\
   Allowed: one of `"DoNotSchedule"`, `"ScheduleAnyway"`, `"off"`.
 
-- **`server.topologySpread.zones`** (string)
-  Default: `ScheduleAnyway`.
+- **`server.topologySpread.zones`** (string)\
+  Default: `ScheduleAnyway`.\
   Allowed: one of `"DoNotSchedule"`, `"ScheduleAnyway"`, `"off"`.
 
 ### `server.podDisruptionBudget`
 
 At most this many pods of a group down at once for a drain or upgrade
 
-- **`server.podDisruptionBudget.enabled`** (boolean)
+- **`server.podDisruptionBudget.enabled`** (boolean)\
   Default: `true`.
 
-- **`server.podDisruptionBudget.maxUnavailable`** (integer)
-  Default: `1`.
+- **`server.podDisruptionBudget.maxUnavailable`** (integer)\
+  Default: `1`.\
   Allowed: at least 1.
 
 ### `server.services`
@@ -410,159 +410,159 @@ At most this many pods of a group down at once for a drain or upgrade
 
 Web, JMAP and the API, inside the cluster. Front ends and an Ingress or Gateway route point here.
 
-- **`server.services.http.type`** (string)
-  Default: `ClusterIP`.
+- **`server.services.http.type`** (string)\
+  Default: `ClusterIP`.\
   Allowed: one of `"ClusterIP"`, `"NodePort"`, `"LoadBalancer"`.
 
-- **`server.services.http.annotations`** (map of string)
+- **`server.services.http.annotations`** (map of string)\
   Default: `{}`.
 
-- **`server.services.http.groups`** (array)
+- **`server.services.http.groups`** (array)\
   Default: `[front, core]`.
 
 #### `server.services.mail`
 
 Mail from outside, on the standard ports. Local keeps each client's own address (no SNAT): the load balancer sends only to nodes running a mail pod.
 
-- **`server.services.mail.enabled`** (boolean)
+- **`server.services.mail.enabled`** (boolean)\
   Default: `true`.
 
-- **`server.services.mail.type`** (string)
-  Default: `LoadBalancer`.
+- **`server.services.mail.type`** (string)\
+  Default: `LoadBalancer`.\
   Allowed: one of `"LoadBalancer"`, `"NodePort"`, `"ClusterIP"`.
 
-- **`server.services.mail.externalTrafficPolicy`** (string)
-  Default: `Local`.
+- **`server.services.mail.externalTrafficPolicy`** (string)\
+  Default: `Local`.\
   Allowed: one of `"Local"`, `"Cluster"`.
 
-- **`server.services.mail.loadBalancerClass`** (string)
+- **`server.services.mail.loadBalancerClass`** (string)\
   Default: `""`.
 
-- **`server.services.mail.loadBalancerIP`** (string)
+- **`server.services.mail.loadBalancerIP`** (string)\
   Default: `""`.
 
-- **`server.services.mail.annotations`** (map of string)
+- **`server.services.mail.annotations`** (map of string)\
   Default: `{}`.
 
-- **`server.services.mail.groups`** (array)
+- **`server.services.mail.groups`** (array)\
   Default: `[front, mta]`.
 
 #### `server.services.mail.ports`
 
-- **`server.services.mail.ports.smtp`** (integer)
-  Default: `25`.
+- **`server.services.mail.ports.smtp`** (integer)\
+  Default: `25`.\
   Allowed: at least 0; at most 65535.
 
-- **`server.services.mail.ports.submissions`** (integer)
-  Default: `465`.
+- **`server.services.mail.ports.submissions`** (integer)\
+  Default: `465`.\
   Allowed: at least 0; at most 65535.
 
-- **`server.services.mail.ports.imaps`** (integer)
-  Default: `993`.
+- **`server.services.mail.ports.imaps`** (integer)\
+  Default: `993`.\
   Allowed: at least 0; at most 65535.
 
-- **`server.services.mail.ports.pop3s`** (integer)
-  Default: `995`.
+- **`server.services.mail.ports.pop3s`** (integer)\
+  Default: `995`.\
   Allowed: at least 0; at most 65535.
 
-- **`server.services.mail.ports.sieve`** (integer)
-  Default: `4190`.
+- **`server.services.mail.ports.sieve`** (integer)\
+  Default: `4190`.\
   Allowed: at least 0; at most 65535.
 
 #### `server.services.mail.proxyProtocol`
 
 PROXY protocol v2 from the load balancer, instead of keeping the client's address with externalTrafficPolicy Local alone. The pods get a second listener for each mail port (these ports in the pod) that takes the client's address from the PROXY header, believed only from trustedNetworks: the load balancer's own addresses, as it connects to the pods. Keep externalTrafficPolicy Local: with Cluster, connections arrive from the nodes, and trusting nodes lets anyone who reaches a port claim any address. The load balancer listens on the standard ports (25, 465, ...): the server tells mail from the internet by port 25, which it reads from the PROXY header. Needs server 27.1-rc.32.
 
-- **`server.services.mail.proxyProtocol.enabled`** (boolean)
+- **`server.services.mail.proxyProtocol.enabled`** (boolean)\
   Default: `false`.
 
-- **`server.services.mail.proxyProtocol.trustedNetworks`** (list of string)
-  Default: `[]`.
+- **`server.services.mail.proxyProtocol.trustedNetworks`** (list of string)\
+  Default: `[]`.\
   The load balancer's addresses, as it connects to the pods: addresses or networks of /8 or narrower.
 
 #### `server.services.mail.proxyProtocol.ports`
 
-- **`server.services.mail.proxyProtocol.ports.smtp`** (integer)
-  Default: `10025`.
-  Allowed: at least 0; at most 65535.
+- **`server.services.mail.proxyProtocol.ports.smtp`** (integer)\
+  Default: `10025`.\
+  Allowed: at least 0; at most 65535.\
   A port in the pod, or 0 to leave the listener out.
 
-- **`server.services.mail.proxyProtocol.ports.submissions`** (integer)
-  Default: `10465`.
-  Allowed: at least 0; at most 65535.
+- **`server.services.mail.proxyProtocol.ports.submissions`** (integer)\
+  Default: `10465`.\
+  Allowed: at least 0; at most 65535.\
   A port in the pod, or 0 to leave the listener out.
 
-- **`server.services.mail.proxyProtocol.ports.imaps`** (integer)
-  Default: `10993`.
-  Allowed: at least 0; at most 65535.
+- **`server.services.mail.proxyProtocol.ports.imaps`** (integer)\
+  Default: `10993`.\
+  Allowed: at least 0; at most 65535.\
   A port in the pod, or 0 to leave the listener out.
 
-- **`server.services.mail.proxyProtocol.ports.pop3s`** (integer)
-  Default: `10995`.
-  Allowed: at least 0; at most 65535.
+- **`server.services.mail.proxyProtocol.ports.pop3s`** (integer)\
+  Default: `10995`.\
+  Allowed: at least 0; at most 65535.\
   A port in the pod, or 0 to leave the listener out.
 
-- **`server.services.mail.proxyProtocol.ports.sieve`** (integer)
-  Default: `14190`.
-  Allowed: at least 0; at most 65535.
+- **`server.services.mail.proxyProtocol.ports.sieve`** (integer)\
+  Default: `14190`.\
+  Allowed: at least 0; at most 65535.\
   A port in the pod, or 0 to leave the listener out.
 
 ### `server.backup`
 
 A nightly export of the whole store to an S3 bucket (`inbuxa --export s3://...`), streamed, while the server runs. Each goes in a new folder named for the time, with export.json written last: an export without it didn't finish. Nothing here deletes old exports: give the bucket a lifecycle rule. Restore into a new, empty store with `inbuxa --import s3://bucket/prefix` (the newest finished export) before any server pod starts. Needs server 27.1-rc.34.
 
-- **`server.backup.enabled`** (boolean)
+- **`server.backup.enabled`** (boolean)\
   Default: `false`.
 
-- **`server.backup.schedule`** (string)
-  Default: `"30 2 * * *"`.
-  Allowed: at least 1 character.
+- **`server.backup.schedule`** (string)\
+  Default: `"30 2 * * *"`.\
+  Allowed: at least 1 character.\
   Cron, in timeZone (the controller's, UTC on most clusters, when empty)
 
-- **`server.backup.timeZone`** (string)
+- **`server.backup.timeZone`** (string)\
   Default: `""`.
 
-- **`server.backup.url`** (string)
-  Default: `""`.
-  Allowed: matching `^$|^s3://[^/]+(/.*)?$`.
+- **`server.backup.url`** (string)\
+  Default: `""`.\
+  Allowed: matching `^$|^s3://[^/]+(/.*)?$`.\
   s3://bucket/prefix
 
-- **`server.backup.endpoint`** (string)
-  Default: `""`.
-  Allowed: matching `^$|^https?://`.
+- **`server.backup.endpoint`** (string)\
+  Default: `""`.\
+  Allowed: matching `^$|^https?://`.\
   An S3-compatible service (MinIO, Garage, Ceph), addressed path-style; empty for AWS
 
-- **`server.backup.region`** (string)
-  Default: `us-east-1`.
+- **`server.backup.region`** (string)\
+  Default: `us-east-1`.\
   Allowed: at least 1 character.
 
-- **`server.backup.existingSecret`** (string)
-  Default: `""`.
+- **`server.backup.existingSecret`** (string)\
+  Default: `""`.\
   A Secret with the keys under access-key and secret-key. Empty: the AWS defaults (the pod's role, through serviceAccountName)
 
-- **`server.backup.serviceAccountName`** (string)
+- **`server.backup.serviceAccountName`** (string)\
   Default: `""`.
 
-- **`server.backup.timeoutSeconds`** (integer)
-  Default: `21600`.
-  Allowed: at least 60.
+- **`server.backup.timeoutSeconds`** (integer)\
+  Default: `21600`.\
+  Allowed: at least 60.\
   A run longer than this is stopped (and fails)
 
-- **`server.backup.backoffLimit`** (integer)
-  Default: `1`.
-  Allowed: at least 0.
+- **`server.backup.backoffLimit`** (integer)\
+  Default: `1`.\
+  Allowed: at least 0.\
   Tries per night: a failed try leaves an unfinished folder behind
 
-- **`server.backup.successfulJobsHistoryLimit`** (integer)
-  Default: `3`.
+- **`server.backup.successfulJobsHistoryLimit`** (integer)\
+  Default: `3`.\
   Allowed: at least 0.
 
-- **`server.backup.failedJobsHistoryLimit`** (integer)
-  Default: `3`.
+- **`server.backup.failedJobsHistoryLimit`** (integer)\
+  Default: `3`.\
   Allowed: at least 0.
 
-- **`server.backup.resources`** (object)
-  Default: `{}`.
+- **`server.backup.resources`** (object)\
+  Default: `{}`.\
   Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, as quantities (100m, 256Mi).
 
 ### `server.storeCheck`
@@ -571,43 +571,43 @@ Store checks on a schedule (`inbuxa --store-check`): quick finds blobs the store
 
 #### `server.storeCheck.quick`
 
-- **`server.storeCheck.quick.enabled`** (boolean)
+- **`server.storeCheck.quick.enabled`** (boolean)\
   Default: `false`.
 
-- **`server.storeCheck.quick.schedule`** (string)
-  Default: `"15 3 * * *"`.
+- **`server.storeCheck.quick.schedule`** (string)\
+  Default: `"15 3 * * *"`.\
   Allowed: at least 1 character.
 
-- **`server.storeCheck.quick.timeoutSeconds`** (integer)
-  Default: `21600`.
+- **`server.storeCheck.quick.timeoutSeconds`** (integer)\
+  Default: `21600`.\
   Allowed: at least 60.
 
 #### `server.storeCheck.full`
 
-- **`server.storeCheck.full.enabled`** (boolean)
+- **`server.storeCheck.full.enabled`** (boolean)\
   Default: `false`.
 
-- **`server.storeCheck.full.schedule`** (string)
-  Default: `"15 4 * * 0"`.
+- **`server.storeCheck.full.schedule`** (string)\
+  Default: `"15 4 * * 0"`.\
   Allowed: at least 1 character.
 
-- **`server.storeCheck.full.timeoutSeconds`** (integer)
-  Default: `172800`.
+- **`server.storeCheck.full.timeoutSeconds`** (integer)\
+  Default: `172800`.\
   Allowed: at least 60.
 
-- **`server.storeCheck.timeZone`** (string)
+- **`server.storeCheck.timeZone`** (string)\
   Default: `""`.
 
-- **`server.storeCheck.successfulJobsHistoryLimit`** (integer)
-  Default: `3`.
+- **`server.storeCheck.successfulJobsHistoryLimit`** (integer)\
+  Default: `3`.\
   Allowed: at least 0.
 
-- **`server.storeCheck.failedJobsHistoryLimit`** (integer)
-  Default: `3`.
+- **`server.storeCheck.failedJobsHistoryLimit`** (integer)\
+  Default: `3`.\
   Allowed: at least 0.
 
-- **`server.storeCheck.resources`** (object)
-  Default: `{}`.
+- **`server.storeCheck.resources`** (object)\
+  Default: `{}`.\
   Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, as quantities (100m, 256Mi).
 
 ### `server.metrics`
@@ -616,182 +616,182 @@ Metrics, for Prometheus or an OpenTelemetry collector. Needs server 27.1-rc.34; 
 
 #### `server.metrics.prometheus`
 
-- **`server.metrics.prometheus.enabled`** (boolean)
-  Default: `false`.
+- **`server.metrics.prometheus.enabled`** (boolean)\
+  Default: `false`.\
   Every server pod serves /metrics/prometheus on its http port, behind basic auth. A headless Service, <release>-metrics, lists them all.
 
-- **`server.metrics.prometheus.username`** (string)
-  Default: `prometheus`.
+- **`server.metrics.prometheus.username`** (string)\
+  Default: `prometheus`.\
   Allowed: matching `^[^:\s]+$`.
 
-- **`server.metrics.prometheus.existingSecret`** (string)
-  Default: `""`.
+- **`server.metrics.prometheus.existingSecret`** (string)\
+  Default: `""`.\
   A Secret with the keys username (the same as above) and password. Empty: the chart makes one, with a random password kept across upgrades. The pods read the password as a file.
 
 #### `server.metrics.prometheus.serviceMonitor`
 
 A ServiceMonitor for the Prometheus Operator, scraping each pod
 
-- **`server.metrics.prometheus.serviceMonitor.enabled`** (boolean)
+- **`server.metrics.prometheus.serviceMonitor.enabled`** (boolean)\
   Default: `false`.
 
-- **`server.metrics.prometheus.serviceMonitor.interval`** (string)
-  Default: `30s`.
+- **`server.metrics.prometheus.serviceMonitor.interval`** (string)\
+  Default: `30s`.\
   Allowed: matching `^[0-9]+(ms|s|m|h)$`.
 
-- **`server.metrics.prometheus.serviceMonitor.labels`** (map of string)
+- **`server.metrics.prometheus.serviceMonitor.labels`** (map of string)\
   Default: `{}`.
 
 #### `server.metrics.prometheus.rules`
 
 PrometheusRules: alerts for a pod down, a cluster lease not renewed, a large or stuck queue, failing deliveries, a certificate about to expire and a slow data store. They read the pods' group from the label the ServiceMonitor adds, so they need it on.
 
-- **`server.metrics.prometheus.rules.enabled`** (boolean)
+- **`server.metrics.prometheus.rules.enabled`** (boolean)\
   Default: `false`.
 
-- **`server.metrics.prometheus.rules.labels`** (map of string)
+- **`server.metrics.prometheus.rules.labels`** (map of string)\
   Default: `{}`.
 
-- **`server.metrics.prometheus.rules.kubeStateMetrics`** (boolean)
-  Default: `true`.
+- **`server.metrics.prometheus.rules.kubeStateMetrics`** (boolean)\
+  Default: `true`.\
   Alerts on restarts and readiness from kube-state-metrics, when the cluster has it
 
-- **`server.metrics.prometheus.rules.queueMessages`** (integer)
-  Default: `5000`.
-  Allowed: at least 1.
+- **`server.metrics.prometheus.rules.queueMessages`** (integer)\
+  Default: `5000`.\
+  Allowed: at least 1.\
   Messages in the queue
 
-- **`server.metrics.prometheus.rules.queueOldestHours`** (number)
-  Default: `24`.
-  Allowed: more than 0.
+- **`server.metrics.prometheus.rules.queueOldestHours`** (number)\
+  Default: `24`.\
+  Allowed: more than 0.\
   Hours the oldest message may wait. A queue keeps retrying a message for days, so one that waits longer is worth a look.
 
-- **`server.metrics.prometheus.rules.deliveryFailureRatio`** (number)
-  Default: `0.25`.
-  Allowed: more than 0; at most 1.
+- **`server.metrics.prometheus.rules.deliveryFailureRatio`** (number)\
+  Default: `0.25`.\
+  Allowed: more than 0; at most 1.\
   Share of deliveries that bounce, over half an hour, once at least deliveryFailureMinimum have
 
-- **`server.metrics.prometheus.rules.deliveryFailureMinimum`** (integer)
-  Default: `10`.
+- **`server.metrics.prometheus.rules.deliveryFailureMinimum`** (integer)\
+  Default: `10`.\
   Allowed: at least 1.
 
-- **`server.metrics.prometheus.rules.certificateDays`** (number)
-  Default: `14`.
-  Allowed: more than 0.
+- **`server.metrics.prometheus.rules.certificateDays`** (number)\
+  Default: `14`.\
+  Allowed: more than 0.\
   Days before the first certificate in use expires
 
-- **`server.metrics.prometheus.rules.storeLatencyMs`** (number)
-  Default: `1000`.
-  Allowed: more than 0.
+- **`server.metrics.prometheus.rules.storeLatencyMs`** (number)\
+  Default: `1000`.\
+  Allowed: more than 0.\
   99th-percentile data store read or write, in milliseconds
 
-- **`server.metrics.prometheus.rules.backupHours`** (number)
-  Default: `36`.
-  Allowed: more than 0.
+- **`server.metrics.prometheus.rules.backupHours`** (number)\
+  Default: `36`.\
+  Allowed: more than 0.\
   With backup on and kubeStateMetrics: hours since the last export that finished
 
 #### `server.metrics.otlp`
 
 Push metrics to an OpenTelemetry collector over OTLP. Only when the store has no OpenTelemetry metrics set: the console's setting wins. Every pod pushes its own, named by service.instance.id and k8s.pod.name; the collector adds them up.
 
-- **`server.metrics.otlp.enabled`** (boolean)
+- **`server.metrics.otlp.enabled`** (boolean)\
   Default: `false`.
 
-- **`server.metrics.otlp.endpoint`** (string)
-  Default: `""`.
-  Allowed: matching `^$|^https?://`.
+- **`server.metrics.otlp.endpoint`** (string)\
+  Default: `""`.\
+  Allowed: matching `^$|^https?://`.\
   The collector, e.g. http://otel-collector.monitoring:4318
 
-- **`server.metrics.otlp.protocol`** (string)
-  Default: `http/protobuf`.
-  Allowed: one of `"http/protobuf"`, `"grpc"`.
+- **`server.metrics.otlp.protocol`** (string)\
+  Default: `http/protobuf`.\
+  Allowed: one of `"http/protobuf"`, `"grpc"`.\
   http/protobuf or grpc
 
-- **`server.metrics.otlp.intervalSeconds`** (integer)
-  Default: `60`.
+- **`server.metrics.otlp.intervalSeconds`** (integer)\
+  Default: `60`.\
   Allowed: at least 1.
 
-- **`server.metrics.otlp.headersSecret`** (string)
-  Default: `""`.
+- **`server.metrics.otlp.headersSecret`** (string)\
+  Default: `""`.\
   A Secret whose key headers holds headers to send, key=value pairs by commas or lines, for a collector that wants a token. The pods read it as a file.
 
 #### `server.metrics.grafanaDashboard`
 
 A Grafana dashboard as a ConfigMap, for Grafana's dashboard sidecar
 
-- **`server.metrics.grafanaDashboard.enabled`** (boolean)
+- **`server.metrics.grafanaDashboard.enabled`** (boolean)\
   Default: `false`.
 
-- **`server.metrics.grafanaDashboard.labels`** (map of string)
+- **`server.metrics.grafanaDashboard.labels`** (map of string)\
   The label the sidecar looks for
 
-- **`server.metrics.grafanaDashboard.labels.grafana_dashboard`** (string)
+- **`server.metrics.grafanaDashboard.labels.grafana_dashboard`** (string)\
   Default: `"1"`.
 
-- **`server.metrics.grafanaDashboard.annotations`** (map of string)
+- **`server.metrics.grafanaDashboard.annotations`** (map of string)\
   Default: `{}`.
 
 ## `webmail`
 
 The webmail, signing people in through the server's own page (OAuth). Off by default: it needs its own address, and the server's publicUrl.
 
-- **`webmail.enabled`** (boolean)
+- **`webmail.enabled`** (boolean)\
   Default: `false`.
 
 ### `webmail.image`
 
-- **`webmail.image.repository`** (string)
-  Default: `ghcr.io/inbuxa/inbuxa-webmail`.
+- **`webmail.image.repository`** (string)\
+  Default: `ghcr.io/inbuxa/inbuxa-webmail`.\
   Allowed: at least 1 character.
 
-- **`webmail.image.tag`** (string)
-  Default: `""`.
+- **`webmail.image.tag`** (string)\
+  Default: `""`.\
   The webmail's own release (27.1-rc.N); it's versioned apart from the server, so there's no default. Needs 27.1-rc.7 or later.
 
-- **`webmail.image.digest`** (string)
-  Default: `""`.
+- **`webmail.image.digest`** (string)\
+  Default: `""`.\
   Allowed: matching `^(sha256:[0-9a-f]{64})?$`.
 
-- **`webmail.image.pullPolicy`** (string)
-  Default: `IfNotPresent`.
+- **`webmail.image.pullPolicy`** (string)\
+  Default: `IfNotPresent`.\
   Allowed: one of `"Always"`, `"IfNotPresent"`, `"Never"`.
 
-- **`webmail.publicUrl`** (string)
-  Default: `""`.
-  Allowed: matching `^(https://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$`.
+- **`webmail.publicUrl`** (string)\
+  Default: `""`.\
+  Allowed: matching `^(https://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$`.\
   Where browsers reach it, as https://host. Required. The server registers it as an OAuth client with this address.
 
-- **`webmail.replicas`** (integer)
-  Default: `2`.
+- **`webmail.replicas`** (integer)\
+  Default: `2`.\
   Allowed: at least 1.
 
-- **`webmail.existingSecret`** (string)
-  Default: `""`.
+- **`webmail.existingSecret`** (string)\
+  Default: `""`.\
   A Secret with app-secret (seals sessions; the same on every replica) and oauth-client-secret (the server holds it too). Empty: the chart makes one with random values and keeps them across upgrades. The webmail reads both as files, never from its environment.
 
-- **`webmail.previousAppSecret`** (boolean)
-  Default: `false`.
+- **`webmail.previousAppSecret`** (boolean)\
+  Default: `false`.\
   While rotating app-secret: true, with the old value(s), comma-separated, under app-secret-previous in existingSecret. Sessions sealed with them still open. Set it back to false once they have expired.
 
-- **`webmail.trustedProxies`** (list of string)
-  Default: `[]`.
+- **`webmail.trustedProxies`** (list of string)\
+  Default: `[]`.\
   Addresses whose X-Forwarded-For the webmail believes, as CIDRs. Empty: the private ranges, which covers an ingress inside the cluster.
 
 ### `webmail.autoscaling`
 
-- **`webmail.autoscaling.enabled`** (boolean)
+- **`webmail.autoscaling.enabled`** (boolean)\
   Default: `false`.
 
-- **`webmail.autoscaling.minReplicas`** (integer)
-  Default: `2`.
+- **`webmail.autoscaling.minReplicas`** (integer)\
+  Default: `2`.\
   Allowed: at least 1.
 
-- **`webmail.autoscaling.maxReplicas`** (integer)
-  Default: `6`.
+- **`webmail.autoscaling.maxReplicas`** (integer)\
+  Default: `6`.\
   Allowed: at least 1.
 
-- **`webmail.autoscaling.targetCPUUtilizationPercentage`** (integer)
-  Default: `70`.
+- **`webmail.autoscaling.targetCPUUtilizationPercentage`** (integer)\
+  Default: `70`.\
   Allowed: at least 1; at most 100.
 
 ### `webmail.resources`
@@ -800,92 +800,92 @@ Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, 
 
 #### `webmail.resources.requests`
 
-- **`webmail.resources.requests.cpu`** (string or number)
+- **`webmail.resources.requests.cpu`** (string or number)\
   Default: `100m`.
 
-- **`webmail.resources.requests.memory`** (string or number)
+- **`webmail.resources.requests.memory`** (string or number)\
   Default: `128Mi`.
 
 #### `webmail.resources.limits`
 
-- **`webmail.resources.limits.cpu`** (string or number)
+- **`webmail.resources.limits.cpu`** (string or number)\
   Default: `"1"`.
 
-- **`webmail.resources.limits.memory`** (string or number)
+- **`webmail.resources.limits.memory`** (string or number)\
   Default: `512Mi`.
 
 ### `webmail.podDisruptionBudget`
 
-- **`webmail.podDisruptionBudget.enabled`** (boolean)
+- **`webmail.podDisruptionBudget.enabled`** (boolean)\
   Default: `true`.
 
-- **`webmail.podDisruptionBudget.maxUnavailable`** (integer or string)
+- **`webmail.podDisruptionBudget.maxUnavailable`** (integer or string)\
   Default: `1`.
 
-- **`webmail.nodeSelector`** (map of string)
+- **`webmail.nodeSelector`** (map of string)\
   Default: `{}`.
 
-- **`webmail.tolerations`** (array)
+- **`webmail.tolerations`** (array)\
   Default: `[]`.
 
-- **`webmail.affinity`** (object)
+- **`webmail.affinity`** (object)\
   Default: `{}`.
 
-- **`webmail.podAnnotations`** (map of string)
+- **`webmail.podAnnotations`** (map of string)\
   Default: `{}`.
 
-- **`webmail.extraEnv`** (array)
+- **`webmail.extraEnv`** (array)\
   Default: `[]`.
 
 ## `console`
 
 INBUXA Admin, the console, served as static files; the browser talks to the server's publicUrl directly. Off by default, like the webmail.
 
-- **`console.enabled`** (boolean)
+- **`console.enabled`** (boolean)\
   Default: `false`.
 
 ### `console.image`
 
-- **`console.image.repository`** (string)
-  Default: `ghcr.io/inbuxa/inbuxa-admin`.
+- **`console.image.repository`** (string)\
+  Default: `ghcr.io/inbuxa/inbuxa-admin`.\
   Allowed: at least 1 character.
 
-- **`console.image.tag`** (string)
-  Default: `""`.
+- **`console.image.tag`** (string)\
+  Default: `""`.\
   The console's own release (27.1-rc.N); no default, as for the webmail
 
-- **`console.image.digest`** (string)
-  Default: `""`.
+- **`console.image.digest`** (string)\
+  Default: `""`.\
   Allowed: matching `^(sha256:[0-9a-f]{64})?$`.
 
-- **`console.image.pullPolicy`** (string)
-  Default: `IfNotPresent`.
+- **`console.image.pullPolicy`** (string)\
+  Default: `IfNotPresent`.\
   Allowed: one of `"Always"`, `"IfNotPresent"`, `"Never"`.
 
-- **`console.publicUrl`** (string)
-  Default: `""`.
-  Allowed: matching `^(https://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$`.
+- **`console.publicUrl`** (string)\
+  Default: `""`.\
+  Allowed: matching `^(https://[A-Za-z0-9.-]+(:[0-9]+)?/?)?$`.\
   Where browsers reach it, as https://host. Required. The server registers it as an OAuth client and lets its origin call the API.
 
-- **`console.replicas`** (integer)
-  Default: `2`.
+- **`console.replicas`** (integer)\
+  Default: `2`.\
   Allowed: at least 1.
 
 ### `console.autoscaling`
 
-- **`console.autoscaling.enabled`** (boolean)
+- **`console.autoscaling.enabled`** (boolean)\
   Default: `false`.
 
-- **`console.autoscaling.minReplicas`** (integer)
-  Default: `2`.
+- **`console.autoscaling.minReplicas`** (integer)\
+  Default: `2`.\
   Allowed: at least 1.
 
-- **`console.autoscaling.maxReplicas`** (integer)
-  Default: `4`.
+- **`console.autoscaling.maxReplicas`** (integer)\
+  Default: `4`.\
   Allowed: at least 1.
 
-- **`console.autoscaling.targetCPUUtilizationPercentage`** (integer)
-  Default: `70`.
+- **`console.autoscaling.targetCPUUtilizationPercentage`** (integer)\
+  Default: `70`.\
   Allowed: at least 1; at most 100.
 
 ### `console.resources`
@@ -894,49 +894,49 @@ Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, 
 
 #### `console.resources.requests`
 
-- **`console.resources.requests.cpu`** (string or number)
+- **`console.resources.requests.cpu`** (string or number)\
   Default: `20m`.
 
-- **`console.resources.requests.memory`** (string or number)
+- **`console.resources.requests.memory`** (string or number)\
   Default: `32Mi`.
 
 #### `console.resources.limits`
 
-- **`console.resources.limits.cpu`** (string or number)
+- **`console.resources.limits.cpu`** (string or number)\
   Default: `500m`.
 
-- **`console.resources.limits.memory`** (string or number)
+- **`console.resources.limits.memory`** (string or number)\
   Default: `128Mi`.
 
 ### `console.podDisruptionBudget`
 
-- **`console.podDisruptionBudget.enabled`** (boolean)
+- **`console.podDisruptionBudget.enabled`** (boolean)\
   Default: `true`.
 
-- **`console.podDisruptionBudget.maxUnavailable`** (integer or string)
+- **`console.podDisruptionBudget.maxUnavailable`** (integer or string)\
   Default: `1`.
 
-- **`console.nodeSelector`** (map of string)
+- **`console.nodeSelector`** (map of string)\
   Default: `{}`.
 
-- **`console.tolerations`** (array)
+- **`console.tolerations`** (array)\
   Default: `[]`.
 
-- **`console.affinity`** (object)
+- **`console.affinity`** (object)\
   Default: `{}`.
 
-- **`console.podAnnotations`** (map of string)
+- **`console.podAnnotations`** (map of string)\
   Default: `{}`.
 
 ## `networkPolicy`
 
 NetworkPolicies: every pod the chart makes denies all traffic in and out except what it needs (templates/networkpolicy.yaml has the map). They need a CNI that enforces them.
 
-- **`networkPolicy.enabled`** (boolean)
+- **`networkPolicy.enabled`** (boolean)\
   Default: `true`.
 
-- **`networkPolicy.httpFrom`** (list of object)
-  Default: `[]`.
+- **`networkPolicy.httpFrom`** (list of object)\
+  Default: `[]`.\
   Who may reach the HTTP ports of the server, the webmail and the console: your ingress controller or gateway, as NetworkPolicy peers, e.g. Empty: from anywhere. The webmail always reaches the server.
 
   ```yaml
@@ -944,8 +944,8 @@ NetworkPolicies: every pod the chart makes denies all traffic in and out except 
       matchLabels: {kubernetes.io/metadata.name: ingress-nginx}
   ```
 
-- **`networkPolicy.metricsFrom`** (list of object)
-  Default: `[]`.
+- **`networkPolicy.metricsFrom`** (list of object)\
+  Default: `[]`.\
   Prometheus, when httpFrom is set: it scrapes the server pods' http port. As NetworkPolicy peers, e.g.
 
   ```yaml
@@ -953,12 +953,12 @@ NetworkPolicies: every pod the chart makes denies all traffic in and out except 
       matchLabels: {kubernetes.io/metadata.name: monitoring}
   ```
 
-- **`networkPolicy.serverEgress`** (list of object)
-  Default: `[]`.
+- **`networkPolicy.serverEgress`** (list of object)\
+  Default: `[]`.\
   Where the server and its Jobs may connect, as NetworkPolicy egress rules, besides DNS. Empty: anywhere, which a mail server needs to deliver mail unless it hands everything to a relay. Narrow it to your data store, relay and the Kubernetes API (for the upgrade Job) if you can.
 
-- **`networkPolicy.webmailInternet`** (boolean)
-  Default: `true`.
+- **`networkPolicy.webmailInternet`** (boolean)\
+  Default: `true`.\
   The webmail fetches remote images in mail and subscribed calendars over HTTP and HTTPS. Off: only the server.
 
 ## `routes`
@@ -967,27 +967,27 @@ Routes from outside to the server's publicUrl, the webmail's and the console's, 
 
 ### `routes.gateway`
 
-- **`routes.gateway.enabled`** (boolean)
+- **`routes.gateway.enabled`** (boolean)\
   Default: `false`.
 
-- **`routes.gateway.parentRefs`** (array)
-  Default: `[]`.
+- **`routes.gateway.parentRefs`** (array)\
+  Default: `[]`.\
   The Gateway listeners to attach to, e.g. [{name: public, namespace: gateway}]
 
-- **`routes.gateway.annotations`** (map of string)
+- **`routes.gateway.annotations`** (map of string)\
   Default: `{}`.
 
 ### `routes.ingress`
 
-- **`routes.ingress.enabled`** (boolean)
+- **`routes.ingress.enabled`** (boolean)\
   Default: `false`.
 
-- **`routes.ingress.className`** (string)
+- **`routes.ingress.className`** (string)\
   Default: `""`.
 
-- **`routes.ingress.annotations`** (map of string)
+- **`routes.ingress.annotations`** (map of string)\
   Default: `{}`.
 
-- **`routes.ingress.tls`** (array)
-  Default: `[]`.
+- **`routes.ingress.tls`** (array)\
+  Default: `[]`.\
   As an Ingress takes it, e.g. [{hosts: [mail.example.org], secretName: mail-tls}]
