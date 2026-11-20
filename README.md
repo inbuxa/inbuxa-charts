@@ -31,6 +31,20 @@ enforces them. Every pod starts from deny all, in and out:
 
 The kubelet's probes come from the node, which NetworkPolicy always allows.
 
+## Releases
+
+A tag `v27.1-rc.N` releases chart `27.1.0-rc.N` (`.github/workflows/release.yml`,
+run on the GitHub mirror for its keyless signing). It pins the server, webmail
+and console images named in `release/suite.yaml` by digest, after checking
+each one's signature; pushes the chart to `oci://ghcr.io/inbuxa/charts` and
+the Gitea registry, signed with cosign; and puts rendered manifests and a
+minisign-signed `SHA256SUMS` on the release page.
+
+    tools/verify-release.sh 27.1.0-rc.1
+
+checks a release as someone installing it would: the chart's signature, the
+checksums and their signature, and every pinned image's signature.
+
 Installs on real clusters, the mail tests and the upgrade tests are in
 [inbuxa-k8s-lab](https://git.coffeylabs.org/inbuxa/inbuxa-k8s-lab). The guide
 is at [docs.inbuxa.org](https://docs.inbuxa.org/).

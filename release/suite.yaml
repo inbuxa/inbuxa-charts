@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 Coffey Labs LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# The images the next chart release runs (K-C13): one place, so a chart
+# release names exactly one server, webmail and console. Each is a release
+# tag of that image. The release workflow checks each image's signature
+# against the workflow that signed it, resolves its digest, and pins both
+# into the chart; nothing else picks an image.
+#
+# Move these in the pull request that prepares a chart release.
+server: 27.1-rc.33
+webmail: 27.1-rc.10
+console: 27.1-rc.22

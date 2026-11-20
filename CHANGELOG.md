@@ -112,3 +112,8 @@ runs, pinned by digest.
   webmail reaches DNS, the server and the web (`networkPolicy.webmailInternet`
   for remote images); the console reaches nothing. Every pod passes Pod
   Security "restricted", tested in enforce mode.
+- Releases (K-C13): a `v*` tag releases the chart from `release/suite.yaml`,
+  with the server, webmail and console images pinned by digest once their
+  signatures check out; the chart pushed to GHCR and the Gitea registry and
+  signed keyless with cosign; rendered manifests; a minisign-signed
+  `SHA256SUMS`. `tools/verify-release.sh` checks all of it.
