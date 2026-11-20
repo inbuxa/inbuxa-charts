@@ -19,6 +19,17 @@ the upgrade Job, which scales the server down for a layout change through a
 Role that only it holds. Secrets reach the pods as mounted files, never as
 values or environment variables.
 
+The server writes to two emptyDirs and nowhere else:
+
+| Path | What's written there |
+|---|---|
+| `/tmp` | application bundles, unpacked when an Application is installed |
+| `/var/lib/inbuxa` | the working directory: a migration's work files, under `migrations/` |
+
+Both go with the pod, which is all they need. `config.json` is a read-only
+mount of `server.dataStore`, so the data store settings can't be saved in
+the console: they change through the chart's values instead.
+
 NetworkPolicies are on by default (`networkPolicy`) and need a CNI that
 enforces them. Every pod starts from deny all, in and out:
 
