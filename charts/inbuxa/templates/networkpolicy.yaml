@@ -19,6 +19,12 @@ all, in and out; the policies after it open only what each one needs:
                                                       and calendars (networkPolicy.webmailInternet)
   console         8080 from networkPolicy.httpFrom    nothing (the browser calls the server)
 
+The seed and upgrade Jobs are hooks, and a hook runs before the release's
+own objects exist: on a first install, before any of these policies. So the
+deny-all and the jobs' policy are rendered twice, the second time as hooks
+that run first (weight -20) and go once the hooks have succeeded, by which
+point the release's own copies are there.
+
 httpFrom empty means from anywhere: the ingress controller or gateway that
 routes to these ports is in a namespace the chart can't know. The kubelet's
 probes come from the node, which NetworkPolicy always allows.
@@ -166,4 +172,40 @@ spec:
   ingress:
     {{- include "inbuxa.networkPolicy.frontEndIngress" $root | nindent 4 }}
 {{- end }}
+{{- /* The two the hook Jobs need, as hooks; see the top of this file */}}
+{{- $hook := dict "helm.sh/hook" "pre-install,pre-upgrade,pre-rollback" "helm.sh/hook-weight" "-20" "helm.sh/hook-delete-policy" "before-hook-creation,hook-succeeded" }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "inbuxa.fullname" $root }}-hooks-deny-all
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+  annotations:
+    {{- toYaml $hook | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "inbuxa.selectorLabels" $root | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "inbuxa.fullname" $root }}-hooks-jobs
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "inbuxa.labels" $root | nindent 4 }}
+  annotations:
+    {{- toYaml $hook | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "inbuxa.selectorLabels" $root | nindent 6 }}
+    matchExpressions:
+      - {key: app.kubernetes.io/component, operator: In, values: [seed, upgrade]}
+  policyTypes: [Ingress, Egress]
+  egress:
+    {{- include "inbuxa.networkPolicy.serverEgress" $root | nindent 4 }}
 {{- end }}
