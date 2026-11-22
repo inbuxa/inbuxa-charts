@@ -512,19 +512,7 @@
               "$ref": "#/definitions/group"
             },
             "core": {
-              "allOf": [
-                {
-                  "$ref": "#/definitions/group"
-                },
-                {
-                  "properties": {
-                    "replicas": {
-                      "description": "0 or 1: a second core would queue every maintenance task twice.",
-                      "maximum": 1
-                    }
-                  }
-                }
-              ]
+              "$ref": "#/definitions/group"
             }
           }
         },

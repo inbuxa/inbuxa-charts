@@ -114,7 +114,7 @@
         "overrides": []
       },
       "options": {},
-      "description": "Counted from the store every five minutes by the core pod"
+      "description": "Counted from the store every five minutes by the core pod holding the metrics lease"
     },
     {
       "id": 3,

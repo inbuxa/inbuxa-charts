@@ -164,11 +164,14 @@ server:
       # gateway policy, say. Not app.kubernetes.io/ or inbuxa.org/ ones.
       podLabels: {}
       extraEnv: []
-    # Everything, including the task scheduler. Exactly one replica: a
-    # second would queue every maintenance task twice.
+    # Everything, including the task scheduler and the alerts. Several
+    # replicas take turns: one at a time holds each of those roles (a lease
+    # in the store), and another takes over within about four minutes when
+    # it stops. Needs a coordinator in the store's settings, as several
+    # pods of any group do.
     core:
       enabled: true
-      replicas: 1
+      replicas: 2
       role: ""
       resources: {}
       nodeSelector: {}

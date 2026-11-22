@@ -28,7 +28,7 @@ tests:
           path: data["config.json"]
           value: '{"@type":"PostgreSql","authSecret":{"@type":"File","filePath":"/etc/inbuxa/secrets/pg-password"},"authUsername":"inbuxa","database":"inbuxa","host":"pg-rw.data.svc","port":5432,"useTls":true}'
 
-  - it: makes one Deployment per group, core with a single replica
+  - it: makes one Deployment per group, two replicas each
     template: server/deployment.yaml
     asserts:
       - hasDocuments:
@@ -43,16 +43,16 @@ tests:
         documentIndex: 1
       - equal:
           path: spec.replicas
-          value: 1
+          value: 2
         documentIndex: 2
 
-  - it: never runs two cores at once, even mid-rollout
+  - it: keeps core at full strength during a rollout, as the others
     template: server/deployment.yaml
     documentIndex: 2
     asserts:
       - equal:
           path: spec.strategy.rollingUpdate
-          value: {maxSurge: 0, maxUnavailable: 1}
+          value: {maxSurge: 1, maxUnavailable: 0}
 
   - it: keeps front at full strength during a rollout
     template: server/deployment.yaml
@@ -230,12 +230,15 @@ tests:
             - {name: imaps, port: 993, targetPort: imaps, protocol: TCP}
             - {name: sieve, port: 4190, targetPort: sieve, protocol: TCP}
 
-  - it: refuses a core with a second replica
+  - it: runs core alone when asked
     set:
-      server.groups.core.replicas: 2
+      server.groups.core.replicas: 1
     template: server/deployment.yaml
+    documentIndex: 2
     asserts:
-      - failedTemplate: {}
+      - equal:
+          path: spec.replicas
+          value: 1
 
   - it: counts clients by the address the proxies pass on
     template: server/deployment.yaml

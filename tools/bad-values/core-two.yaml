@@ -1,4 +1,0 @@
-# refuses: replicas.*(maximum|less than or equal)
-server:
-  groups:
-    core: {replicas: 2}
