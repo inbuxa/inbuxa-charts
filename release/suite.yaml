@@ -9,5 +9,5 @@
 #
 # Move these in the pull request that prepares a chart release.
 server: 27.1-rc.41
-webmail: 27.1-rc.12
-console: 27.1-rc.22
+webmail: 27.1-rc.14
+console: 27.1-rc.24
