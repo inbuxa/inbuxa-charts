@@ -274,15 +274,14 @@ As front, plus outbound delivery. Place it where its egress address is the one y
 
 #### `server.groups.core`
 
-Everything, including the task scheduler. Exactly one replica: a second would queue every maintenance task twice.
+Everything, including the task scheduler and the alerts. Several replicas take turns: one at a time holds each of those roles (a lease in the store), and another takes over within about four minutes when it stops. Needs a coordinator in the store's settings, as several pods of any group do.
 
 - **`server.groups.core.enabled`** (boolean)\
   Default: `true`.
 
 - **`server.groups.core.replicas`** (integer)\
-  Default: `1`.\
-  Allowed: at least 0; at most 1.\
-  0 or 1: a second core would queue every maintenance task twice.
+  Default: `2`.\
+  Allowed: at least 0.
 
 - **`server.groups.core.role`** (string)\
   Default: `""`.\

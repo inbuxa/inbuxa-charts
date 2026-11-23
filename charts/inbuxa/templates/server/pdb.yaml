@@ -2,9 +2,9 @@
 SPDX-FileCopyrightText: 2026 Coffey Labs LLC
 SPDX-License-Identifier: Apache-2.0
 
-A drain or upgrade takes down at most maxUnavailable pods of a group. For
-the single core that means it can be moved, with a short gap in the
-scheduled tasks, rather than blocking every drain.
+A drain or upgrade takes down at most maxUnavailable pods of a group. A
+group of one can still be moved, with a short gap, rather than blocking
+every drain.
 */}}
 {{- if .Values.server.podDisruptionBudget.enabled }}
 {{- $root := . }}

@@ -13,8 +13,9 @@ runs, pinned by digest.
   keys, and CI (`helm lint` under Helm 4 and 3, kubeconform against
   Kubernetes 1.35 to 1.37, kube-linter, helm-unittest).
 - The server, as three Deployments: `front` (client protocols and web),
-  `mta` (as front, plus outbound delivery) and `core` (everything, exactly
-  one replica). The data store is a value, written as `config.json`; its
+  `mta` (as front, plus outbound delivery) and `core` (everything; two
+  replicas that take turns with the scheduler and the alerts, server
+  27.1-rc.40). The data store is a value, written as `config.json`; its
   secrets are Secrets mounted under `/etc/inbuxa/secrets`.
 - Pods that run as a non-root user with every capability dropped, a
   read-only root filesystem and the RuntimeDefault seccomp profile. They

@@ -6,9 +6,9 @@ Metrics: the scrape password, a headless Service listing every server pod,
 a ServiceMonitor, PrometheusRules and a Grafana dashboard.
 
 Each pod counts its own traffic, so Prometheus scrapes every pod, not a
-Service that picks one. The queue gauges are read from the core pod, which
-always counts the queue itself: another pod's queue count is only what it
-queued and delivered since the last count.
+Service that picks one. The queue gauges are read from the core pods: the
+one holding the metrics lease counts the queue in the store every five
+minutes, and the others report 0, so the largest is the count.
 */}}
 {{- $root := . }}
 {{- $full := include "inbuxa.fullname" . }}
