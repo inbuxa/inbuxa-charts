@@ -16,7 +16,9 @@ runs, pinned by digest.
   `mta` (as front, plus outbound delivery) and `core` (everything; two
   replicas that take turns with the scheduler and the alerts, server
   27.1-rc.40). The data store is a value, written as `config.json`; its
-  secrets are Secrets mounted under `/etc/inbuxa/secrets`.
+  secrets are Secrets mounted under `/etc/inbuxa/secrets`. `kubectl logs`
+  shows each pod's log (server 27.1-rc.41 writes it to standard output as
+  well as to its log file).
 - Pods that run as a non-root user with every capability dropped, a
   read-only root filesystem and the RuntimeDefault seccomp profile. They
   listen on the standard mail ports through the namespaced sysctl
