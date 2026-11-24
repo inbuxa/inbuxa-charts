@@ -44,6 +44,9 @@ runs, pinned by digest.
   `webmail.existingSecret`, mounted as files rather than set in its
   environment; `webmail.previousAppSecret` reads the old app secret during a
   rotation. The webmail checks its read-only root at start (`IMMUTABLE`).
+  Push goes through the webmail's relay, which any replica serves; the chart
+  refuses `PUSH_URL` (push by subscription) in `webmail.extraEnv` unless the
+  webmail runs exactly one replica (inbuxa-webmail#149).
   Every server pod is told both addresses, so it registers them as OAuth
   clients; the webmail's client secret reaches the server as a mounted file
   too (`INBUXA_WEBMAIL_CLIENT_SECRET_FILE`), never the environment.

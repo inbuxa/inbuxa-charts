@@ -452,6 +452,9 @@ webmail:
   tolerations: []
   affinity: {}
   podAnnotations: {}
+  # More of the webmail's environment. Push goes through the relay, which
+  # any number of replicas serve. PUSH_URL (push by subscription) works with
+  # one replica only, so the chart refuses it with more (inbuxa-webmail#149).
   extraEnv: []
 
 # INBUXA Admin, the console, served as static files; the browser talks to
