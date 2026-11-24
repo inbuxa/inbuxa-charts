@@ -131,6 +131,37 @@ tests:
       - failedTemplate:
           errorPattern: "previousAppSecret needs webmail.existingSecret"
 
+  - it: refuses PUSH_URL with more than one replica
+    template: webmail.yaml
+    set:
+      webmail.extraEnv: [{name: PUSH_URL, value: "https://webmail.example.org"}]
+    asserts:
+      - failedTemplate:
+          errorPattern: "PUSH_URL \\(push by subscription\\) works with one webmail replica only"
+
+  - it: refuses PUSH_URL with autoscaling, even from one replica
+    template: webmail.yaml
+    set:
+      webmail.replicas: 1
+      webmail.autoscaling.enabled: true
+      webmail.extraEnv: [{name: PUSH_URL, value: "https://webmail.example.org"}]
+    asserts:
+      - failedTemplate:
+          errorPattern: "works with one webmail replica only"
+
+  - it: takes PUSH_URL with one replica
+    template: webmail.yaml
+    set:
+      webmail.replicas: 1
+      webmail.extraEnv: [{name: PUSH_URL, value: "https://webmail.example.org"}]
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: PUSH_URL, value: "https://webmail.example.org"}
+        documentSelector:
+          path: kind
+          value: Deployment
+
   - it: tells every server pod about the webmail and the console, so it registers them
     template: server/deployment.yaml
     asserts:

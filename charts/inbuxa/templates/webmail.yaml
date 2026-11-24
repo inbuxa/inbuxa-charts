@@ -19,6 +19,12 @@ the server inside the cluster, through the HTTP Service.
 {{- if and $wm.previousAppSecret (not $wm.existingSecret) }}
 {{- fail "webmail.previousAppSecret needs webmail.existingSecret: the chart's own Secret keeps only the two keys it makes" }}
 {{- end }}
+{{- /* Push by subscription keeps its tokens in one process (inbuxa-webmail#149) */}}
+{{- range $wm.extraEnv }}
+{{- if and (eq .name "PUSH_URL") (or $wm.autoscaling.enabled (ne (int $wm.replicas) 1)) }}
+{{- fail "webmail.extraEnv: PUSH_URL (push by subscription) works with one webmail replica only (inbuxa-webmail#149). Leave it out, and push goes through the relay, which any number of replicas serve; or set webmail.replicas to 1 with autoscaling off" }}
+{{- end }}
+{{- end }}
 {{- if and (not $wm.existingSecret) (not $root.Values.generateSecrets) }}
 {{- fail "webmail.existingSecret: generateSecrets is off, so name a Secret with app-secret and oauth-client-secret (48 random characters each)" }}
 {{- end }}

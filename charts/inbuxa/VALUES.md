@@ -843,7 +843,8 @@ Kubernetes resources: requests and limits of cpu, memory and ephemeral-storage, 
   Default: `{}`.
 
 - **`webmail.extraEnv`** (array)\
-  Default: `[]`.
+  Default: `[]`.\
+  More of the webmail's environment. Push goes through the relay, which any number of replicas serve. PUSH_URL (push by subscription) works with one replica only, so the chart refuses it with more (inbuxa-webmail#149).
 
 ## `console`
 
