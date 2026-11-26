@@ -8,6 +8,6 @@
 # into the chart; nothing else picks an image.
 #
 # Move these in the pull request that prepares a chart release.
-server: 27.1-rc.43
+server: 27.1-rc.49
 webmail: 27.1-rc.14
 console: 27.1-rc.24
