@@ -60,6 +60,14 @@ body:
       label: Load balancer and ingress
       placeholder: MetalLB, Envoy Gateway
   - type: textarea
+    id: report
+    attributes:
+      label: report.sh output
+      description: >-
+        The block inbuxa-k8s-lab's lab/report.sh prints. It reads your
+        cluster and changes nothing, and it leaves out names and addresses.
+      render: markdown
+  - type: textarea
     id: notes
     attributes:
       label: What you saw

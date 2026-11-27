@@ -6,7 +6,50 @@ Chart versions follow the inbuxa suite: release candidates `27.1.0-rc.N`,
 then `27.1.0`. Each release says which server, webmail and console images it
 runs, pinned by digest.
 
-## Unreleased
+## 27.1.0-rc.1
+
+The chart's first release, a release candidate: for test clusters and test
+domains, not live mail. It runs server 27.1-rc.49, webmail 27.1-rc.16 and
+console 27.1-rc.24, pinned by digest. The guide is at
+https://docs.inbuxa.org/kubernetes/, and its page on testing a release
+candidate says how to report what you find.
+
+### Known limits
+- Tested by us on kind only: Kubernetes 1.35, 1.36 and 1.37, amd64 and
+  arm64, under Pod Security "restricted". Every night the lab runs the
+  install and mail tests, killing pods, draining nodes and failing over
+  PostgreSQL, NATS and S3 with mail flowing, installs through Argo CD and
+  Flux, and the 27.1 crossing from a 2026.x store. Managed clouds and other
+  distributions aren't tested yet: that's what tester reports are for.
+- The week-long soak so far was a rehearsal on kind, on an earlier version
+  of the chart. It passed, with no mail lost. The full soak, on a
+  three-node cluster with the current chart, runs in January, before
+  27.1.0.
+- Push by subscription (`PUSH_URL` in `webmail.extraEnv`) works with one
+  webmail replica only, and the chart refuses it with more
+  (inbuxa-webmail#149). Push through the relay, the default, has no limit.
+- The data store settings are `server.dataStore`, a read-only
+  `config.json`: they change through the values, never in the console.
+- The 27.1 crossing changes a 2026.x store's layout, which can't be undone
+  without a backup taken first. The upgrade refuses it until
+  `server.upgrade.acknowledgeLayout` is 3, and mail is down while it runs.
+- Outbound mail can leave from the `core` pods too, not only `mta`: core
+  has no role, so it runs every task, delivery included. Place `core`
+  where your outbound address is, as you place `mta`. The egress check
+  only follows `mta` for now.
+- cert-manager itself isn't in the lab. Certificates from a TLS Secret,
+  renewed in place, are tested; the Certificate the chart asks
+  cert-manager for is rendered and checked only. It always makes a new
+  key on renewal, which changes a DANE `3 1 1` record each time.
+- The lab reaches the pods through port-forwards, so the Gateway API and
+  Ingress routes are rendered and checked, but haven't carried live
+  traffic in a test yet.
+- The rendered manifests on the release page are the chart's defaults,
+  with no seed or addresses: a starting point. Render your own with
+  `helm template` and your values, and set `generateSecrets: false`.
+- The guide has the pages for installing, mail in and out, troubleshooting
+  and testing. Certificates, security, scaling, upgrading, backups,
+  monitoring and the runbooks follow in later release candidates.
 
 ### Added
 - The repository: the chart's layout, a values schema that refuses unknown
