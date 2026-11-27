@@ -33,6 +33,14 @@ candidate says how to report what you find.
 - The 27.1 crossing changes a 2026.x store's layout, which can't be undone
   without a backup taken first. The upgrade refuses it until
   `server.upgrade.acknowledgeLayout` is 3, and mail is down while it runs.
+- Outbound mail can leave from the `core` pods too, not only `mta`: core
+  has no role, so it runs every task, delivery included. Place `core`
+  where your outbound address is, as you place `mta`. The egress check
+  only follows `mta` for now.
+- cert-manager itself isn't in the lab. Certificates from a TLS Secret,
+  renewed in place, are tested; the Certificate the chart asks
+  cert-manager for is rendered and checked only. It always makes a new
+  key on renewal, which changes a DANE `3 1 1` record each time.
 - The lab reaches the pods through port-forwards, so the Gateway API and
   Ingress routes are rendered and checked, but haven't carried live
   traffic in a test yet.
