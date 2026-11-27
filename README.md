@@ -20,10 +20,11 @@
 > Report issues at **[git.coffeylabs.org/inbuxa/inbuxa-charts/issues](https://git.coffeylabs.org/inbuxa/inbuxa-charts/issues)**, join discussions at **[community.coffeylabs.org](https://community.coffeylabs.org)**, or chat on **[Discord](https://discord.gg/nqcY4TKfAn)**.
 
 > [!WARNING]
-> **In development.** The chart is being built for inbuxa 27.1 and has no
-> release yet: the first is `27.1.0-rc.1`, a release candidate, with the
-> install guide on [docs.inbuxa.org](https://docs.inbuxa.org). Until then,
-> nothing here is supported for running mail.
+> **Release candidates.** The chart's releases, from `27.1.0-rc.1`, are
+> release candidates for inbuxa 27.1: for test clusters and test domains,
+> not live mail. The install guide is on
+> [docs.inbuxa.org](https://docs.inbuxa.org/kubernetes/), with a page on
+> [testing a release candidate](https://docs.inbuxa.org/kubernetes/testing/).
 
 The Helm chart for running **inbuxa** on Kubernetes: the mail server, the
 [webmail](https://git.coffeylabs.org/inbuxa/inbuxa-webmail) and the

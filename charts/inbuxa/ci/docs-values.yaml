@@ -31,10 +31,10 @@ server:
       rules: {enabled: true}
 webmail:
   enabled: true
-  image: {tag: 27.1-rc.9}
+  image: {tag: 27.1-rc.16}
   publicUrl: https://webmail.example.org
   existingSecret: webmail-secrets
 console:
   enabled: true
-  image: {tag: 27.1-rc.22}
+  image: {tag: 27.1-rc.24}
   publicUrl: https://admin.example.org

@@ -28,4 +28,6 @@ or cluster roles yet, and the front and mta groups name roles that don't
 exist. Set the seed and install again on an empty store.
 {{- end }}
 
-This chart is in development. The guide is at https://docs.inbuxa.org/
+This is a release candidate: for test clusters and test domains, not live
+mail. The guide: https://docs.inbuxa.org/kubernetes/
+Report how it went: https://git.coffeylabs.org/inbuxa/inbuxa-charts/issues
